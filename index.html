@@ -1,0 +1,79 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <link rel="stylesheet" href="css/slick.grid.css" type="text/css"/>
+  <link rel="stylesheet" href="css/slick-default-theme.css" type="text/css"/>
+  <link rel="stylesheet" href="css/ric.css" type="text/css"/>
+</head>
+<body>
+  <form>
+    <textarea id="query" style="width:90%;height:100px;padding:0;"></textarea>
+    <br/>
+    <input id="run-query" type="button" value="run sparql"/>
+    <br/><br/>
+  </form>
+  <div id="myGrid" style="width:90%;height:500px;"></div>
+</table>
+
+<script type="text/javascript" src="js/jquery-1.7.min.js"></script>
+<script type="text/javascript" src="js/jquery.event.drag-2.2.js"></script>
+<script type="text/javascript" src="js/slick.core.js"></script>
+<script type="text/javascript" src="js/slick.grid.js"></script>
+<script type="text/javascript">
+  $(function() {
+    var grid;
+
+
+    function getQueryResults(query) {
+      console.log('running query');
+      $.ajax({
+        url: ("http://opendatacommunities.org/sparql.json?query=" + query),
+        dataType: 'json',
+        success: function(data){
+          populateGrid(data)
+        },
+        error: function(){
+          alert('error running query');
+        }
+      });
+    }
+
+    function populateGrid(sparqlResults) {
+
+      var columnWidth = 220;
+      var columns = [];
+      $.each(sparqlResults["head"]["vars"], function(i, col) {
+        columns.push({id: col, name: col, field: col, width: columnWidth});
+      });
+
+      var data = [];
+      $.each(sparqlResults["results"]["bindings"], function(i, res) {
+        var row = {};
+        $.each(columns, function(i, col) {
+          field = col.field;
+          row[field] = res[field]["value"];
+        });
+        data.push(row);
+      });
+
+      var options = {
+        enableCellNavigation: false,
+        enableColumnReorder: false,
+        //forceFitColumns: true,
+        syncColumnCellResize: true
+      };
+
+      grid = new Slick.Grid("#myGrid", data, columns, options);
+    }
+
+    $("#run-query").click(function(e) {
+      var query = $("#query").val();
+      console.log(query);
+      getQueryResults( query );
+    });
+
+
+  });
+</script>
+</body>
+</html>

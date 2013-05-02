@@ -1,0 +1,13 @@
+body {
+  font-family: 'Helvetica Neue', Helvetica, Arial;
+  font-size: 10pt;
+  background: #eee;
+  padding: 0;
+  margin: 8;
+}
+
+#myGrid {
+  background: white;
+  outline: 0;
+  border: 1px solid gray;
+}
