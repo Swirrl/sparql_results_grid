@@ -1,7 +1,8 @@
 body {
   font-family: 'Helvetica Neue', Helvetica, Arial;
   font-size: 10pt;
-  background: #eee;
+  background: #fafafa;
+  font-color: #222;
   padding: 0;
   margin: 8;
 }
@@ -11,3 +12,24 @@ body {
   outline: 0;
   border: 1px solid gray;
 }
+
+.slick-cell.row-num {
+  background: #f3f3f3;
+  border-right: 1px solid silver;
+}
+
+.slick-cell {
+  border-right: 1px dotted silver;
+  background: #fefefe;
+}
+
+.slick-header-columns {
+  background: none;
+  border:none !important;
+}
+
+.slick-header-column, .slick-header-column:hover, .slick-header-column-active {
+  background: #f3f3f3;
+  border-bottom: 1px solid silver !important;
+}
+

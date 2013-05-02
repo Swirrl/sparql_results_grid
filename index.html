@@ -7,7 +7,7 @@
 </head>
 <body>
   <form>
-    <textarea id="query" style="width:90%;height:100px;padding:0;"></textarea>
+    <textarea id="query" style="width:90%;height:100px;padding:0;">select * Where { ?s ?p ?o } LIMIT 100</textarea>
     <br/>
     <input id="run-query" type="button" value="run sparql"/>
     <br/><br/>
@@ -29,11 +29,13 @@
       $.ajax({
         url: ("http://opendatacommunities.org/sparql.json?query=" + query),
         dataType: 'json',
+        timeout: 10000,
         success: function(data){
-          populateGrid(data)
+          populateGrid(data);
         },
-        error: function(){
-          alert('error running query');
+        error: function(jqXHR, textStatus, errorThrown){
+          console.log(jqXHR);
+          alert('error');
         }
       });
     }
@@ -41,17 +43,22 @@
     function populateGrid(sparqlResults) {
 
       var columnWidth = 220;
-      var columns = [];
+      var columns = [{id: '__row_num', field: '__row_num', name: '#', width: 40, cssClass: 'row-num' }];
       $.each(sparqlResults["head"]["vars"], function(i, col) {
         columns.push({id: col, name: col, field: col, width: columnWidth});
       });
 
       var data = [];
-      $.each(sparqlResults["results"]["bindings"], function(i, res) {
+      $.each(sparqlResults["results"]["bindings"], function(rowi, res) {
         var row = {};
-        $.each(columns, function(i, col) {
+        $.each(columns, function(coli, col) {
           field = col.field;
-          row[field] = res[field]["value"];
+          if (coli==0) {
+            row[field] = rowi +1;
+          } else {
+            field = col.field;
+            row[field] = res[field]["value"];
+          }
         });
         data.push(row);
       });
