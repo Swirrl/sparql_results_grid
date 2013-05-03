@@ -1,0 +1,175 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <link rel="stylesheet" href="css/slick.grid.css" type="text/css"/>
+  <link rel="stylesheet" href="css/slick-default-theme.css" type="text/css"/>
+  <link rel="stylesheet" href="css/ric.css" type="text/css"/>
+</head>
+<body>
+  <form>
+    <textarea id="query" style="width:90%;height:100px;padding:0;">select * Where { ?s ?p ?o } LIMIT 10000</textarea>
+    <br/>
+    <input id="run-query" type="button" value="run sparql"/>
+    <br/><br/>
+  </form>
+  <div>
+    This example only loads the data (in 500-row chunks) based on the view port.
+  </div>
+  <div id="myGrid" style="width:90%;height:490px;"></div>
+</table>
+
+<script type="text/javascript" src="js/jquery-1.7.min.js"></script>
+<script type="text/javascript" src="js/jquery.event.drag-2.2.js"></script>
+<script type="text/javascript" src="js/slick.core.js"></script>
+<script type="text/javascript" src="js/slick.ajax-sparql-loader.js"></script>
+<script type="text/javascript" src="js/slick.grid.js"></script>
+<script type="text/javascript">
+  $(function() {
+    var grid;
+    var loader = new Slick.Data.AjaxSparqlLoader();
+    var columnWidth = 220;
+
+    // todo: generate this from the query.
+    var columns = [{id: '__row_num', field: '__row_num', name: '#', width: 60, cssClass: 'row-num' }];
+    var vars = ["s", "p", "o"]
+    $.each(vars, function(i, col) {
+      columns.push({id: col, name: col, field: col, width: columnWidth});
+    });
+
+    var options = {
+      enableCellNavigation: false,
+      enableColumnReorder: false,
+      syncColumnCellResize: true,
+      rowHeight: 24
+    };
+
+    grid = new Slick.Grid("#myGrid", loader.data, columns, options);
+    grid.updateRowCount();
+
+    var viewportChangedTimer;
+
+    grid.onViewportChanged.subscribe(function (e, args) {
+      clearTimeout(viewportChangedTimer);
+      // only fire this every 1/4 sec at most.
+      viewportChangedTimer = setTimeout( function() {
+        console.log('calling ensureData');
+        var vp = grid.getViewport();
+        loader.ensureData(vp.top, vp.bottom);
+
+       }, 250);
+    });
+
+    loader.onDataLoaded.subscribe(function (e, args) {
+      for (var i = args.from; i <= args.to; i++) {
+        grid.invalidateRow(i); // causes the appropriate rows to redraw.
+      }
+
+      grid.updateRowCount(); // uses data.length
+      grid.render();
+      //TODO: hide spinner.
+    });
+
+    $("#run-query").click(function (e) {
+      var query = $("#query").val();
+      loader.setQuery(query);
+      var vp = grid.getViewport();
+      loader.ensureData(vp.top, vp.bottom);
+    });
+
+    // function getQueryResults(query) {
+
+    //   // paginate to stop us hitting the 5MB limit.
+    //   var perPage = 10000;
+    //   var page = 1;
+
+    //   results = [];
+    //   vars = [];
+
+    //   function callAjaxPaging(){
+    //     console.log("trying page: " + page.toString());
+
+    //     $.ajax({
+    //       url: ("http://opendatacommunities.org/sparql.json?query=" + query + "&per_page=" + perPage.toString() + "&page=" + page.toString() ),
+    //       dataType: 'json',
+    //       timeout: 10000,
+    //       success: function(data){
+    //         if (page==1) {
+    //           vars = data["head"]["vars"];
+    //         }
+
+    //         pageOfResults = data["results"]["bindings"];
+    //         results = results.concat(pageOfResults);
+
+    //         console.log("got " + results.length.toString() + " so far");
+    //         console.log("this page has " + pageOfResults.length.toString() + " results");
+
+    //         if (pageOfResults.length == perPage) {
+
+    //           // this page was full. There might be more.
+    //           page +=1;
+    //           console.log("trying next page");
+    //           callAjaxPaging();
+    //         }
+    //         else {
+    //           // no more pages.
+    //           console.log('finished with ' + results.length.toString() + " results");
+    //           populateGrid(vars, results);
+    //         }
+    //       },
+    //       error: function(jqXHR, textStatus, errorThrown){
+    //         console.log(jqXHR);
+    //         alert('error');
+    //       }
+    //     });
+    //   }
+
+    //   callAjaxPaging();
+
+    // }
+
+    // function populateGrid(vars, results) {
+
+    //   console.log('in populate grid');
+
+    //   var columnWidth = 220;
+    //   var columns = [{id: '__row_num', field: '__row_num', name: '#', width: 40, cssClass: 'row-num' }];
+    //   $.each(vars, function(i, col) {
+    //     columns.push({id: col, name: col, field: col, width: columnWidth});
+    //   });
+
+    //   var data = [];
+    //   $.each(results, function(rowi, res) {
+    //     var row = {};
+    //     $.each(columns, function(coli, col) {
+    //       field = col.field;
+    //       if (coli==0) {
+    //         row[field] = rowi +1;
+    //       } else {
+    //         field = col.field;
+    //         row[field] = res[field]["value"];
+    //       }
+    //     });
+    //     data.push(row);
+    //   });
+
+    //   var options = {
+    //     enableCellNavigation: false,
+    //     enableColumnReorder: false,
+    //     //forceFitColumns: true,
+    //     syncColumnCellResize: true
+    //   };
+
+    //   grid = new Slick.Grid("#myGrid", data, columns, options);
+    // }
+
+    // $("#run-query").click(function(e) {
+    //   var query = $("#query").val();
+    //   console.log(query);
+    //   getQueryResults( query );
+    // });
+
+
+  });
+</script>
+</body>
+</html>

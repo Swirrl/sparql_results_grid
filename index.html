@@ -7,11 +7,14 @@
 </head>
 <body>
   <form>
-    <textarea id="query" style="width:90%;height:100px;padding:0;">select * Where { ?s ?p ?o } LIMIT 100</textarea>
+    <textarea id="query" style="width:90%;height:100px;padding:0;">select * Where { ?s ?p ?o } LIMIT 10</textarea>
     <br/>
     <input id="run-query" type="button" value="run sparql"/>
     <br/><br/>
   </form>
+  <div>
+    This example loads the data up-front in 50-row chunks, before rendering.
+  </div>
   <div id="myGrid" style="width:90%;height:500px;"></div>
 </table>
 
@@ -23,33 +26,69 @@
   $(function() {
     var grid;
 
-
     function getQueryResults(query) {
-      console.log('running query');
-      $.ajax({
-        url: ("http://opendatacommunities.org/sparql.json?query=" + query),
-        dataType: 'json',
-        timeout: 10000,
-        success: function(data){
-          populateGrid(data);
-        },
-        error: function(jqXHR, textStatus, errorThrown){
-          console.log(jqXHR);
-          alert('error');
-        }
-      });
+
+      // paginate to stop us hitting the 5MB limit.
+      var perPage = 50;
+      var page = 1;
+
+      results = [];
+      vars = [];
+
+      function callAjaxPaging(){
+        console.log("trying page: " + page.toString());
+
+        $.ajax({
+          url: ("http://opendatacommunities.org/sparql.json?query=" + query + "&per_page=" + perPage.toString() + "&page=" + page.toString() ),
+          dataType: 'json',
+          timeout: 10000,
+          success: function(data){
+            if (page==1) {
+              vars = data["head"]["vars"];
+            }
+
+            pageOfResults = data["results"]["bindings"];
+            results = results.concat(pageOfResults);
+
+            console.log("got " + results.length.toString() + " so far");
+            console.log("this page has " + pageOfResults.length.toString() + " results");
+
+            if (pageOfResults.length == perPage) {
+
+              // this page was full. There might be more.
+              page +=1;
+              console.log("trying next page");
+              callAjaxPaging();
+            }
+            else {
+              // no more pages.
+              console.log('finished with ' + results.length.toString() + " results");
+              populateGrid(vars, results);
+            }
+          },
+          error: function(jqXHR, textStatus, errorThrown){
+            console.log(jqXHR);
+            alert('error');
+          }
+        });
+      }
+
+      callAjaxPaging();
+
     }
 
-    function populateGrid(sparqlResults) {
+    function populateGrid(vars, results) {
+
+      console.log('in populate grid');
 
       var columnWidth = 220;
       var columns = [{id: '__row_num', field: '__row_num', name: '#', width: 40, cssClass: 'row-num' }];
-      $.each(sparqlResults["head"]["vars"], function(i, col) {
+      $.each(vars, function(i, col) {
         columns.push({id: col, name: col, field: col, width: columnWidth});
       });
 
       var data = [];
-      $.each(sparqlResults["results"]["bindings"], function(rowi, res) {
+      $.each(results, function(rowi, res) {
         var row = {};
         $.each(columns, function(coli, col) {
           field = col.field;
