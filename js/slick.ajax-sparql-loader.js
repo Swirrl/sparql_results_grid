@@ -14,7 +14,7 @@
     };
   }
 
-  function AjaxSparqlLoader() {
+  function AjaxSparqlLoader(totalCount) {
 
     var PAGESIZE = 500;
     var SPARQLENDPOINT = 'http://opendatacommunities.org/sparql';
@@ -22,15 +22,19 @@
     var sparqlQuery = null;
     var pagesToLoad = {};
 
+    var columnWidth = 220;
+    var columns = [];
 
     // events
     var onDataLoading = new Slick.Event();
     var onDataLoaded = new Slick.Event();
+    var onColumnsChanged = new Slick.Event();
 
     function clear() {
       for (var key in data) {
         delete data[key];
       }
+      data.length = totalCount;
     }
 
     // from and to are 0-based row indices.
@@ -39,9 +43,6 @@
       console.log('Ensuring data for rows');
       console.log("from: " + from.toString() + " to: " + to.toString());
 
-      // before getting the actual data, get the total count
-      // TODO: make this a query
-      var totalCount = 10000;
       data.length = totalCount;
 
       if (from < 0) {
@@ -112,7 +113,23 @@
       return true;
     }
 
+    function setColumns(responseData) {
+      var vars = responseData["head"]["vars"];
+      if (columns.length == 0) {
+        columns = [{id: '__row_num', field: '__row_num', name: '#', width: 60, cssClass: 'row-num' }];
+        $.each(vars, function(i, col) {
+          columns.push({id: col, name: col, field: col, width: columnWidth});
+        });
+        onColumnsChanged.notify(columns);
+      }
+
+    }
+
     function onSuccess(responseData, jqXHR) {
+
+      setColumns(responseData);
+      console.log(columns);
+
       var page = jqXHR.page;
 
       console.log('success for: ' + page.toString());
@@ -154,9 +171,11 @@
       clear();
     }
 
+
     return {
       // properties
       "data": data,
+      "columns": columns,
 
       // methods
       "clear": clear,
@@ -165,7 +184,8 @@
 
       // events
       "onDataLoading": onDataLoading,
-      "onDataLoaded": onDataLoaded
+      "onDataLoaded": onDataLoaded,
+      "onColumnsChanged": onColumnsChanged
     };
   }
 
