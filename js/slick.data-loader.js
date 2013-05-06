@@ -3,12 +3,12 @@
   function DataLoader(totalCount, pageSize) {
 
     var self = this;
-    var pageSize = 500;
+    var pageSize = pageSize;
     var data = {length: 0}; // the data rows, which we'll fill in, plus an extra property for total length
     var sparqlQuery = null;
     var pagesToLoad = {};
 
-    var columnWidth = 220;
+    var columnWidth = 350;
     var columns = [];
 
     // events
@@ -25,8 +25,6 @@
 
     // from and to are 0-based row indices.
     function ensureData(from, to, loaderFunction){
-
-      console.log(loaderFunction);
 
       console.log('Ensuring data for rows');
       console.log("from: " + from.toString() + " to: " + to.toString());
@@ -86,9 +84,9 @@
     }
 
     // given a page index, and an array of row data, set the data for the page
-    function setPageOfData(page, rowsData) {
+    function setPageOfData(page, rows) {
 
-      var noOfRows = rowsData.length;
+      var noOfRows = rows.length;
       var thisPageFrom = page * pageSize;
       var thisPageTo = thisPageFrom + noOfRows -1;
 
@@ -96,12 +94,14 @@
       for (var i = 0; i < noOfRows; i++) {
 
         // assign the row of results;
-        data[thisPageFrom + i] = rowsData[i];
+        data[thisPageFrom + i] = rows[i];
 
         // set row num (1-based)
         var rowNum = thisPageFrom + i + 1;
         data[thisPageFrom + i]["__row_num"] = rowNum;
       }
+
+      console.log(data);
 
       onDataLoaded.notify({from: thisPageFrom, to: thisPageTo});
     }

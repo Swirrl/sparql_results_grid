@@ -37,7 +37,7 @@
     var grid;
     var loader;
     var SPARQLENDPOINT = 'http://opendatacommunities.org/sparql';
-    var PAGESIZE = 500;
+    var PAGESIZE = 1000;
     var sparqlQuery;
 
     var options = {
@@ -58,8 +58,8 @@
       var results = responseData["results"]["bindings"];
 
       // go through the results, and make rows data.
-      var resultsRow = null;
       for (var i = 0; i < results.length; i++) {
+        var resultsRow = null;
         resultsRow = {};
         for (var col in results[i]) {
           resultsRow[col] = results[i][col]["value"];
@@ -84,7 +84,7 @@
         callbackParameter: "callback",
         success: ajaxSuccess,
         error: function() {
-          alert("error loading pages " + fromPage + " to " + toPage);
+          alert("error loading page " + page);
         }
       });
       req.page = page; // ad a property onto teh jqXHR obj
