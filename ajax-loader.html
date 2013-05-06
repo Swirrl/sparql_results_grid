@@ -30,12 +30,15 @@
 <script type="text/javascript" src="js/jquery-1.7.min.js"></script>
 <script type="text/javascript" src="js/jquery.event.drag-2.2.js"></script>
 <script type="text/javascript" src="js/slick.core.js"></script>
-<script type="text/javascript" src="js/slick.ajax-sparql-loader.js"></script>
+<script type="text/javascript" src="js/slick.data-loader.js"></script>
 <script type="text/javascript" src="js/slick.grid.js"></script>
 <script type="text/javascript">
   $(function() {
     var grid;
     var loader;
+    var SPARQLENDPOINT = 'http://opendatacommunities.org/sparql';
+    var PAGESIZE = 500;
+    var sparqlQuery;
 
     var options = {
       enableCellNavigation: false,
@@ -44,12 +47,55 @@
       rowHeight: 24
     };
 
+    function ajaxSuccess(responseData, textStatus, jqXHR) {
+      // set the columns on the loader if not already set.
+      if (!loader.columnsSet()) {
+        loader.setColumns(responseData["head"]["vars"]);
+      }
+
+      var page = jqXHR.page;
+      var rowsData = [];
+      var results = responseData["results"]["bindings"];
+
+      // go through the results, and make rows data.
+      var resultsRow = null;
+      for (var i = 0; i < results.length; i++) {
+        resultsRow = {};
+        for (var col in results[i]) {
+          resultsRow[col] = results[i][col]["value"];
+        }
+        rowsData.push(resultsRow);
+      }
+
+      // set the page of data against the loader.
+      loader.setPageOfData(jqXHR.page, rowsData);
+    }
+
+    function loaderFunction(page) {
+      console.log('LOADING DATA FOR ' + page.toString());
+
+      // our sparql pages are 1-based.
+      var sparqlPage = page+1
+      var url = SPARQLENDPOINT + ".json?query=" + encodeURIComponent(sparqlQuery) + "&page=" + (sparqlPage).toString() + "&per_page=" + PAGESIZE.toString();
+
+      var req = $.ajax({
+        dataType: 'json',
+        url: url,
+        callbackParameter: "callback",
+        success: ajaxSuccess,
+        error: function() {
+          alert("error loading pages " + fromPage + " to " + toPage);
+        }
+      });
+      req.page = page; // ad a property onto teh jqXHR obj
+    }
+
     function initGridAndLoader() {
 
       var gridSize = parseInt($("#grid-size").val());
-      console.log(gridSize);
-      loader = new Slick.Data.AjaxSparqlLoader(gridSize);
+      loader = new Slick.Data.DataLoader(gridSize, PAGESIZE);
       grid = new Slick.Grid("#myGrid", loader.data, loader.columns, options);
+
 
       loader.onDataLoading.subscribe(function () {
         // TODO... show spinner.
@@ -75,12 +121,13 @@
 
       var viewportChangedTimer;
       grid.onViewportChanged.subscribe(function (e, args) {
+        console.log('viewport changed');
         clearTimeout(viewportChangedTimer);
         // only fire this every 1/4 sec at most.
         viewportChangedTimer = setTimeout( function() {
           console.log('calling ensureData');
           var vp = grid.getViewport();
-          loader.ensureData(vp.top, vp.bottom);
+          loader.ensureData(vp.top, vp.bottom, loaderFunction);
          }, 250);
       });
 
@@ -89,11 +136,11 @@
     initGridAndLoader();
 
     $("#run-query").click(function (e) {
-      var query = $("#query").val();
+      sparqlQuery = $("#query").val();
       initGridAndLoader();
-      loader.setQuery(query);
+      loader.clear();
       var vp = grid.getViewport();
-      loader.ensureData(vp.top, vp.bottom);
+      loader.ensureData(vp.top, vp.bottom, loaderFunction);
     });
 
   });
