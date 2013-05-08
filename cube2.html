@@ -1,0 +1,171 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <link rel="stylesheet" href="css/slick.grid.css" type="text/css"/>
+  <link rel="stylesheet" href="css/slick-default-theme.css" type="text/css"/>
+  <link rel="stylesheet" href="css/ric.css" type="text/css"/>
+</head>
+<body>
+  <div>
+    This example loads 2 dimensions of a cube.
+  </div>
+  <div id="myGrid" style="width:90%;height:490px;"></div>
+</table>
+
+<script type="text/javascript" src="js/jquery-1.7.min.js"></script>
+<script type="text/javascript" src="js/jquery.event.drag-2.2.js"></script>
+<script type="text/javascript" src="js/slick.core.js"></script>
+<script type="text/javascript" src="js/slick.data-loader.js"></script>
+<script type="text/javascript" src="js/slick.grid.js"></script>
+<script type="text/javascript">
+  $(function() {
+
+    var grid;
+    var loader;
+    var SITEDOMAIN = 'odc.dev';
+    var GRIDSIZE = 403; // TODO: calculate this!
+
+    var options = {
+      enableCellNavigation: false,
+      enableColumnReorder: false,
+      syncColumnCellResize: true,
+      rowHeight: 24
+    };
+
+    var columns;
+    var gridSize;
+
+    var datasetSlug = "additional-affordable-dwellings" ;
+    var rowsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refArea";
+    var columnsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refPeriod";
+    var lockedDimensions = {
+      "http://opendatacommunities.org/def/housing/affordableHousingType": "http://opendatacommunities.org/def/housing/concept/affordable-housing-type/social-rent"
+    }
+
+    function getColumns() {
+
+      var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_values.json?dimension=" + encodeURIComponent(columnsDimension);
+
+      $.ajax({
+        dataType: 'json',
+        async: false,
+        url: url,
+        success: function(responseData, textStatus, jqXHR) {
+          console.log('cols success');
+
+          columns = [rowsDimension]; // start with just the row dimension
+          for (var i=0; i < responseData.length; i++) {
+            columns.push(responseData[i]["uri"]); // just use uris for now. TODO change to work with labels too.
+          }
+          loader.setColumns(columns);
+        },
+        error: function() {
+          alert("error loading columns");
+        }
+      });
+
+    }
+
+    function getGridSize() {
+
+      console.log('in get grid size');
+      var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_size.json?dimension=" + encodeURIComponent(rowsDimension);
+
+      var gridSize = 0;
+      $.ajax({
+        dataType: 'json',
+        async: false,
+        url: url,
+        success: function(responseData, textStatus, jqXHR) {
+          gridSize = responseData['size'];
+        },
+        error: function() {
+          alert("error loading columns");
+        }
+      });
+
+      return gridSize;
+    }
+
+    // deals with data coming back from the loaderFunction's ajax call.
+    function loaderAjaxSuccess(responseData, textStatus, jqXHR) {
+      loader.setPageOfData(jqXHR.page, responseData);
+    }
+
+    // at the moment, assume this gets all the data for the whole grid.
+    // TODO: work out how to page this.
+    function loaderFunction(page) {
+      var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/observations.json"
+      url += "?rows_dimension=" + encodeURIComponent(rowsDimension);
+      url += "&columns_dimension=" + encodeURIComponent(columnsDimension);
+
+      for (var lockedDimension in lockedDimensions) {
+        var dimensionVal = lockedDimensions[lockedDimension];
+        url += "&" + encodeURIComponent(lockedDimension) + "=" + encodeURIComponent(dimensionVal);
+      }
+
+      var req = $.ajax({
+        dataType: 'json',
+        url: url,
+        success: loaderAjaxSuccess,
+        error: function() {
+          alert("error loading page: " + page);
+        }
+      });
+      req.page = page; // add a page property onto the jqXHR obj
+    }
+
+    function initGridAndLoader() {
+
+      var gridSize = getGridSize();
+      console.log(gridSize);
+
+      loader = new Slick.Data.DataLoader(gridSize, gridSize);
+      grid = new Slick.Grid("#myGrid", loader.data, loader.columns, options);
+
+      loader.onColumnsChanged.subscribe(function (e, columns) {
+        console.log('handle columns changed');
+        grid.setColumns(columns);
+      });
+
+      getColumns();
+
+      loader.onDataLoading.subscribe(function () {
+        // TODO... show spinner.
+        console.log('loading...');
+      });
+
+      loader.onDataLoaded.subscribe(function (e, args) {
+        console.log(args);
+        for (var i = args.from; i <= args.to; i++) {
+          grid.invalidateRow(i); // causes the appropriate rows to redraw.
+        }
+
+        grid.updateRowCount(); // uses data.length
+        grid.render();
+        //TODO: hide spinner.
+        console.log('loaded');
+      });
+
+      var viewportChangedTimer;
+      grid.onViewportChanged.subscribe(function (e, args) {
+        console.log('viewport changed');
+        clearTimeout(viewportChangedTimer);
+        // only fire this every 1/4 sec at most.
+        viewportChangedTimer = setTimeout( function() {
+          console.log('calling ensureData');
+          var vp = grid.getViewport();
+          loader.ensureData(vp.top, vp.bottom, loaderFunction);
+         }, 250);
+      });
+
+    }
+
+    initGridAndLoader();
+    var vp = grid.getViewport();
+    loader.ensureData(vp.top, vp.bottom, loaderFunction);
+
+  });
+</script>
+</body>
+</html>
