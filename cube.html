@@ -22,18 +22,7 @@
 
     var grid;
     var loader;
-    var SPARQLENDPOINT = 'http://opendatacommunities.org/sparql';
-    var PAGESIZE = 403;
-    var SPARQLPAGESIZE = 10000;
-    var GRIDSIZE = 403; // TODO: calculate this!
-
-    var sparqlQuery = "select ?row ?column ?val where { " +
-  "graph <http://opendatacommunities.org/graph/additional-affordable-dwellings> { " +
-  "  ?s <http://opendatacommunities.org/def/housing/affordableHousingType> <http://opendatacommunities.org/def/housing/concept/affordable-housing-type/social-rent> . " +
-  "?s <http://purl.org/linked-data/sdmx/2009/dimension#refArea> ?row . " +
-  "?s <http://purl.org/linked-data/sdmx/2009/dimension#refPeriod> ?column ." +
-  "?s <http://opendatacommunities.org/def/housing/netAdditionalDwellings> ?val } " +
-  "}";
+    var SITEDOMAIN = 'odc.dev';
 
     var options = {
       enableCellNavigation: false,
@@ -42,26 +31,35 @@
       rowHeight: 24
     };
 
-    var datasetURI = "http://opendatacommunities.org/data/additional-affordable-dwellings" ;
-    var rowsDim = "http://purl.org/linked-data/sdmx/2009/dimension#refArea";
-    var colsDim = "http://purl.org/linked-data/sdmx/2009/dimension#refPeriod";
-    var columns;
+    var columnWidth = 350;
+    var gridSize;
 
-    // this dimension is locked (not used yet).
-    // TODO: use this in the sparql query.
-    var otherDimensions = {
+    var datasetSlug = "additional-affordable-dwellings" ;
+    var rowsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refArea";
+    var rowsDimensionLabel = "Reference Area";
+    var columnsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refPeriod";
+    var lockedDimensions = {
       "http://opendatacommunities.org/def/housing/affordableHousingType": "http://opendatacommunities.org/def/housing/concept/affordable-housing-type/social-rent"
     }
 
+    // var datasetSlug = "wellbeing-lsoa-happy-yesterday-mean";
+    // var rowsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refArea";
+    // var rowsDimensionLabel = "Reference Area";
+    // var columnsDimension = "http://opendatacommunities.org/def/wellbeing/wellbeingQuestion";
+    // var lockedDimensions = {
+    //   "http://purl.org/linked-data/sdmx/2009/dimension#refPeriod": "http://reference.data.gov.uk/id/government-year/2011-2012"
+    // }
+
     function getColumns() {
 
-      // TODO: make this an api call for a dataset?
-      var columnsSparql = "SELECT DISTINCT ?col WHERE { " +
-        "?obs <http://purl.org/linked-data/cube#dataSet> <" + datasetURI + "> . " +
-        "?obs <" + colsDim + "> ?col; " +
-      "} ORDER BY ?col";
+      function rawFormatter(row, cell, value, columnDef, dataContext) {
+        return value;
+      }
 
-      var url = SPARQLENDPOINT + ".json?query=" + encodeURIComponent(columnsSparql);
+      var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_values.json?dimension=" + encodeURIComponent(columnsDimension);
+
+      // row numbers.
+      var columns = [{id: '__row_num', field: '__row_num', name: '#', width: 60, cssClass: 'row-num' }];
 
       $.ajax({
         dataType: 'json',
@@ -70,88 +68,101 @@
         success: function(responseData, textStatus, jqXHR) {
           console.log('cols success');
 
-          columns = [rowsDim]; // start with just the row dimension
-          var results = responseData["results"]["bindings"];
-          for (var i=0; i < results.length; i++) {
-            columns.push(results[i]["col"]["value"]);
+          var rowDimensionLink = "<a href='" + rowsDimension + "'>" + rowsDimensionLabel + "</a>";
+          // start with just the row dimension
+          columns.push({id: rowsDimension, name: rowDimensionLink, field: rowsDimension, width: columnWidth, formatter: rawFormatter });
+
+          for (var i=0; i < responseData.length; i++) {
+            var columnUri = responseData[i]["uri"];
+            var columnLabel = responseData[i]["label"] || responseData[i]["uri"];
+            var columnLink = "<a href='" + columnUri + "'>" + columnLabel + "</a>";
+            columns.push({id: columnUri, name: columnLink, field: columnUri, width: columnWidth, formatter: rawFormatter });
           }
 
-          console.log("SETTING " + columns.length + " COLS");
-
-          loader.setColumns(columns);
         },
         error: function() {
           alert("error loading columns");
         }
       });
 
+      console.log(columns);
+      return columns;
+
+    }
+
+    function getGridSize() {
+
+      console.log('in get grid size');
+      var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_size.json?dimension=" + encodeURIComponent(rowsDimension);
+
+      var gridSize = 0;
+      $.ajax({
+        dataType: 'json',
+        async: false,
+        url: url,
+        success: function(responseData, textStatus, jqXHR) {
+          gridSize = responseData['size'];
+        },
+        error: function() {
+          alert("error loading columns");
+        }
+      });
+
+      return gridSize;
     }
 
     // deals with data coming back from the loaderFunction's ajax call.
     function loaderAjaxSuccess(responseData, textStatus, jqXHR) {
+      var processedData = processResponseData(responseData);
+      loader.setPageOfData(jqXHR.page, processedData);
+    }
 
-      console.log('loader ajax success');
-      var results = responseData["results"]["bindings"];
+    // add labels for rows.
+    function processResponseData(responseData) {
 
-      console.log(results); // the results of this query.
-      console.log(columns); // this has already been set up earlier
+      var start = new Date();
 
-      var page = jqXHR.page; // will always be 0 for now.
-      var rows = []; // array rows to add to the grid
-      var rowsData = {}; // 'hash' of row URIs to row data.
+      var processedData = [];
 
-      // populate the rowsData hash.
-      for (var i=0; i < results.length; i++) {
-        var result = results[i];
+      for( var i=0; i < responseData.length; i++ ) {
 
-        var rowUri = result["row"]["value"];
-        var columnUri = result["column"]["value"];
-        var val = result["val"]["value"];
+        var row = responseData[i];
+        var processedRow = {};
 
-        if (!rowsData[rowUri]) {
-          rowsData[rowUri] = {};
+        for (var key in row) {
+          if (key == rowsDimension) {
+
+            // TODO: look up from rows hash
+            // processedRow[key] = "<a href='" + row[key] + "'>" + "label" +"</a>";
+            processedRow[key] = row[key];
+          } else {
+
+            var rowData = row[key];
+            var obsUri = rowData["obs"];
+            var obsVal = rowData["val"];
+
+            processedRow[key] = "<a href='" + obsUri + "'>" + (obsVal || "").toString() + "</a>";
+          }
         }
-        rowsData[rowUri][columnUri] = val;
+
+        processedData.push(processedRow);
       }
 
-      // we should now have a full populated rowsData 'hash'.
-      // {
-      //   "row-1-uri": {"col-1-uri": val, "col-2-uri": val},
-      //   "row-2-uri": ....
-      //  }
-
-      console.log("ROWS DATA HASH");
-      console.log(rowsData);
-
-      for (var rowUri in rowsData) {
-        var resultsRow = null;
-
-        // init the results row with just the row identifier
-        resultsRow = {};
-        resultsRow[rowsDim] = rowUri;
-
-        var thisRowData = rowsData[rowUri];
-        for (var col in thisRowData) {
-          resultsRow[col] = thisRowData[col];
-        }
-        rows.push(resultsRow);
-      }
-
-      console.log("ROWS");
-      console.log(rows);
-
-      // set the page of data against the loader.
-      loader.setPageOfData(jqXHR.page, rows);
+      console.log( 'processing ' + processedData.length.toString() + ' rows took: ' + (new Date() - start) + 'ms');
+      return processedData;
     }
 
     // at the moment, assume this gets all the data for the whole grid.
     // TODO: work out how to page this.
     function loaderFunction(page) {
-      console.log('LOADING DATA FOR ' + page.toString());
+      var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/observations.json"
+      url += "?rows_dimension=" + encodeURIComponent(rowsDimension);
+      url += "&columns_dimension=" + encodeURIComponent(columnsDimension);
 
-      // our sparql pages are 1-based.
-      var sparqlPage = page+1
-      var url = SPARQLENDPOINT + ".json?query=" + encodeURIComponent(sparqlQuery) + "&page=" + (sparqlPage).toString() + "&per_page=" + SPARQLPAGESIZE.toString();
+      for (var lockedDimension in lockedDimensions) {
+        var dimensionVal = lockedDimensions[lockedDimension];
+        url += "&" + encodeURIComponent(lockedDimension) + "=" + encodeURIComponent(dimensionVal);
+      }
 
       var req = $.ajax({
         dataType: 'json',
@@ -161,20 +172,17 @@
           alert("error loading page: " + page);
         }
       });
+
       req.page = page; // add a page property onto the jqXHR obj
     }
 
     function initGridAndLoader() {
 
-      loader = new Slick.Data.DataLoader(GRIDSIZE, PAGESIZE);
-      grid = new Slick.Grid("#myGrid", loader.data, loader.columns, options);
+      var gridSize = getGridSize();
+      var columns = getColumns();
 
-      loader.onColumnsChanged.subscribe(function (e, columns) {
-        console.log('handle columns changed');
-        grid.setColumns(columns);
-      });
-
-      getColumns();
+      loader = new Slick.Data.DataLoader(gridSize, gridSize);
+      grid = new Slick.Grid("#myGrid", loader.data, columns, options);
 
       loader.onDataLoading.subscribe(function () {
         // TODO... show spinner.

@@ -39,6 +39,9 @@
     var SPARQLENDPOINT = 'http://opendatacommunities.org/sparql';
     var PAGESIZE = 1000;
     var sparqlQuery;
+    var columnWidth = 350;
+
+    var columns = [];
 
     var options = {
       enableCellNavigation: false,
@@ -48,9 +51,18 @@
     };
 
     function ajaxSuccess(responseData, textStatus, jqXHR) {
-      // set the columns on the loader if not already set.
-      if (!loader.columnsSet()) {
-        loader.setColumns(responseData["head"]["vars"]);
+      // set the columns if not already set.
+
+      console.log(columns.length.toString() + 'columns');
+
+      if (columns.length == 0 ) {
+        var vars = responseData["head"]["vars"];
+        columns = [{id: '__row_num', field: '__row_num', name: '#', width: 60, cssClass: 'row-num' }];
+        $.each(vars, function(i, col) {
+          columns.push({id: col, name: col, field: col, width: columnWidth});
+        });
+        console.log('setting cols');
+        grid.setColumns(columns);
       }
 
       var page = jqXHR.page;
@@ -91,10 +103,11 @@
     }
 
     function initGridAndLoader() {
-
+      columns = [];
       var gridSize = parseInt($("#grid-size").val());
+      console.log(gridSize);
       loader = new Slick.Data.DataLoader(gridSize, PAGESIZE);
-      grid = new Slick.Grid("#myGrid", loader.data, loader.columns, options);
+      grid = new Slick.Grid("#myGrid", loader.data, [], options);
 
 
       loader.onDataLoading.subscribe(function () {
@@ -112,11 +125,6 @@
         grid.render();
         //TODO: hide spinner.
         console.log('loaded');
-      });
-
-      loader.onColumnsChanged.subscribe(function (e, columns) {
-        console.log(columns);
-        grid.setColumns(columns);
       });
 
       var viewportChangedTimer;

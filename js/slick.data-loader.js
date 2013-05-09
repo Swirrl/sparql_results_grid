@@ -8,13 +8,9 @@
     var sparqlQuery = null;
     var pagesToLoad = {};
 
-    var columnWidth = 350;
-    var columns = [];
-
     // events
     var onDataLoading = new Slick.Event();
     var onDataLoaded = new Slick.Event();
-    var onColumnsChanged = new Slick.Event();
 
     function clear() {
       for (var key in data) {
@@ -69,20 +65,6 @@
 
     }
 
-    // are the columns set?
-    function columnsSet() {
-      return (columns.length != 0);
-    }
-
-    // set the columns
-    function setColumns(vars) {
-      columns = [{id: '__row_num', field: '__row_num', name: '#', width: 60, cssClass: 'row-num' }];
-      $.each(vars, function(i, col) {
-        columns.push({id: col, name: col, field: col, width: columnWidth});
-      });
-      onColumnsChanged.notify(columns);
-    }
-
     // given a page index, and an array of row data, set the data for the page
     function setPageOfData(page, rows) {
 
@@ -101,28 +83,21 @@
         data[thisPageFrom + i]["__row_num"] = rowNum;
       }
 
-      console.log(data);
-
       onDataLoaded.notify({from: thisPageFrom, to: thisPageTo});
     }
 
     return {
       // properties
       "data": data,
-      "columns": columns,
-
 
       // methods
       "clear": clear,
       "ensureData": ensureData,
-      "columnsSet": columnsSet,
-      "setColumns": setColumns,
       "setPageOfData": setPageOfData,
 
       // events
       "onDataLoading": onDataLoading,
       "onDataLoaded": onDataLoaded,
-      "onColumnsChanged": onColumnsChanged
     };
   }
 
