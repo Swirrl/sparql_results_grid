@@ -43,9 +43,11 @@
         }
       }
 
+      console.log("pages to load:");
       console.log(pagesToLoad);
       console.log('from page: ' + fromPage);
       console.log('to page: ' + toPage);
+
 
       // do a bunch of queries to get the data for the range.
       for (var page = fromPage; page <= toPage; page++ ){
@@ -68,6 +70,7 @@
     // given a page index, and an array of row data, set the data for the page
     function setPageOfData(page, rows) {
 
+      pagesToLoad[page] = true; // set the page as loaded.
       var noOfRows = rows.length;
       var thisPageFrom = page * pageSize;
       var thisPageTo = thisPageFrom + noOfRows -1;

@@ -33,6 +33,7 @@
 
     var columnWidth = 350;
     var gridSize;
+    var rowLabels = {}; //'hash' of uris to labels
 
     var datasetSlug = "additional-affordable-dwellings" ;
     var rowsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refArea";
@@ -70,13 +71,13 @@
 
           var rowDimensionLink = "<a href='" + rowsDimension + "'>" + rowsDimensionLabel + "</a>";
           // start with just the row dimension
-          columns.push({id: rowsDimension, name: rowDimensionLink, field: rowsDimension, width: columnWidth, formatter: rawFormatter });
+          columns.push({id: rowsDimension, name: rowDimensionLink, field: rowsDimension, width: columnWidth, sortable:true, formatter: rawFormatter });
 
           for (var i=0; i < responseData.length; i++) {
             var columnUri = responseData[i]["uri"];
             var columnLabel = responseData[i]["label"] || responseData[i]["uri"];
             var columnLink = "<a href='" + columnUri + "'>" + columnLabel + "</a>";
-            columns.push({id: columnUri, name: columnLink, field: columnUri, width: columnWidth, formatter: rawFormatter });
+            columns.push({id: columnUri, name: columnLink, field: columnUri, width: columnWidth, sortable:true, formatter: rawFormatter });
           }
 
         },
@@ -85,8 +86,40 @@
         }
       });
 
-      console.log(columns);
       return columns;
+
+    }
+
+
+
+    function getRowLabels() {
+
+      console.log('getting row labels');
+
+      var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_values.json?dimension=" + encodeURIComponent(rowsDimension);
+
+      $.ajax({
+        dataType: 'json',
+        async: false,
+        url: url,
+        success: function(responseData, textStatus, jqXHR) {
+          console.log('rows success');
+          var start = new Date();
+
+          for (var i=0; i < responseData.length; i++) {
+            var row = responseData[i];
+            var uri = row["uri"];
+            var label = row["label"];
+            rowLabels[uri] = label;
+          }
+          console.log( 'processed row labels in: ' + (new Date() - start) + 'ms');
+        },
+        error: function() {
+          alert("error loading columns");
+        }
+      });
+
+      console.log('got row labels');
 
     }
 
@@ -130,14 +163,13 @@
         var processedRow = {};
 
         for (var key in row) {
+          var rowData = row[key];
           if (key == rowsDimension) {
+            var rowUri = rowData;
+            var rowLabel = rowLabels[rowUri];
 
-            // TODO: look up from rows hash
-            // processedRow[key] = "<a href='" + row[key] + "'>" + "label" +"</a>";
-            processedRow[key] = row[key];
+            processedRow[key] = "<a href='" + row[key] + "'>" + (rowLabel || rowUri) + "</a>";
           } else {
-
-            var rowData = row[key];
             var obsUri = rowData["obs"];
             var obsVal = rowData["val"];
 
@@ -181,6 +213,10 @@
       var gridSize = getGridSize();
       var columns = getColumns();
 
+      console.log('gridSize ' + gridSize.toString());
+
+      getRowLabels(); // sets a top-level var.
+
       loader = new Slick.Data.DataLoader(gridSize, gridSize);
       grid = new Slick.Grid("#myGrid", loader.data, columns, options);
 
@@ -211,6 +247,47 @@
           var vp = grid.getViewport();
           loader.ensureData(vp.top, vp.bottom, loaderFunction);
          }, 250);
+      });
+
+      grid.onSort.subscribe(function (e, args) {
+
+
+        var sortdir = args.sortAsc ? 1 : -1;
+        var sortcol = args.sortCol.field;
+
+        // THIS SORTS THE RAW DATA,
+        // BUT AS IT'S LINKS THAT DOESN'T WORK - it sorts the anchors!
+        // IDEA: DO SORTING ON SERVER, OR USE A CUSTOM DATAVIEW INSTEAD OF AN ARRAY?
+
+        // var gridData = loader.data;
+        // var gridDataArray = [];
+
+        // // assign back into loader data.
+        // for (var i=0; i< loader.data.length; i++) {
+        //   gridDataArray[i] = loader.data[i];
+        // }
+
+        // function comparer(a, b) {
+        //   var x = a[sortcol], y = b[sortcol];
+        //   return (x == y ? 0 : (x > y ? 1 : -1));
+        // }
+
+        // function sort(array, comparer, ascending) {
+        //   array.sort(comparer);
+        //   if(ascending) {
+        //     array.reverse();
+        //   }
+        // }
+
+        // sort(gridDataArray, comparer, args.sortAsc);
+
+        // // assign back into loader data.
+        // for (var i=0; i< loader.data.length; i++) {
+        //   gridData[i] = gridDataArray[i];
+        // }
+
+        // grid.setData(gridData);
+        // grid.render();
       });
 
     }
