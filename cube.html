@@ -23,6 +23,7 @@
     var grid;
     var loader;
     var SITEDOMAIN = 'odc.dev';
+    var PAGESIZE = 20;
 
     var options = {
       enableCellNavigation: false,
@@ -33,7 +34,7 @@
 
     var columnWidth = 350;
     var gridSize;
-    var rowLabels = {}; //'hash' of uris to labels
+   // var rowLabels = {}; //'hash' of uris to labels
 
     var datasetSlug = "additional-affordable-dwellings" ;
     var rowsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refArea";
@@ -42,6 +43,9 @@
     var lockedDimensions = {
       "http://opendatacommunities.org/def/housing/affordableHousingType": "http://opendatacommunities.org/def/housing/concept/affordable-housing-type/social-rent"
     }
+    var orderByColumn = null; // order by rows by default
+    var orderDesc = false; // order asc by default
+
 
     // var datasetSlug = "wellbeing-lsoa-happy-yesterday-mean";
     // var rowsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refArea";
@@ -90,38 +94,36 @@
 
     }
 
+    // function getRowLabels() {
 
+    //   console.log('getting row labels');
 
-    function getRowLabels() {
+    //   var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_values.json?dimension=" + encodeURIComponent(rowsDimension);
 
-      console.log('getting row labels');
+    //   $.ajax({
+    //     dataType: 'json',
+    //     async: false,
+    //     url: url,
+    //     success: function(responseData, textStatus, jqXHR) {
+    //       console.log('rows success');
+    //       var start = new Date();
 
-      var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_values.json?dimension=" + encodeURIComponent(rowsDimension);
+    //       for (var i=0; i < responseData.length; i++) {
+    //         var row = responseData[i];
+    //         var uri = row["uri"];
+    //         var label = row["label"];
+    //         rowLabels[uri] = label;
+    //       }
+    //       console.log( 'processed row labels in: ' + (new Date() - start) + 'ms');
+    //     },
+    //     error: function() {
+    //       alert("error loading columns");
+    //     }
+    //   });
 
-      $.ajax({
-        dataType: 'json',
-        async: false,
-        url: url,
-        success: function(responseData, textStatus, jqXHR) {
-          console.log('rows success');
-          var start = new Date();
+    //   console.log('got row labels');
 
-          for (var i=0; i < responseData.length; i++) {
-            var row = responseData[i];
-            var uri = row["uri"];
-            var label = row["label"];
-            rowLabels[uri] = label;
-          }
-          console.log( 'processed row labels in: ' + (new Date() - start) + 'ms');
-        },
-        error: function() {
-          alert("error loading columns");
-        }
-      });
-
-      console.log('got row labels');
-
-    }
+    // }
 
     function getGridSize() {
 
@@ -163,19 +165,16 @@
         var processedRow = {};
 
         for (var key in row) {
-          var rowData = row[key];
-          if (key == rowsDimension) {
-            var rowUri = rowData;
-            var rowLabel = rowLabels[rowUri];
-
-            processedRow[key] = "<a href='" + row[key] + "'>" + (rowLabel || rowUri) + "</a>";
-          } else {
-            var obsUri = rowData["obs"];
-            var obsVal = rowData["val"];
-
+          if (!(key == rowsDimension || key == "rowlabel" ) ){
+            var obsUri = row[key]["obs"];
+            var obsVal = row[key]["val"];
             processedRow[key] = "<a href='" + obsUri + "'>" + (obsVal || "").toString() + "</a>";
           }
         }
+
+        var rowUri = row[rowsDimension];
+        var rowLabel = row["rowlabel"];
+        processedRow[rowsDimension] = "<a href='" + rowUri + "'>" + (rowLabel || rowUri) + "</a>";
 
         processedData.push(processedRow);
       }
@@ -187,9 +186,20 @@
     // at the moment, assume this gets all the data for the whole grid.
     // TODO: work out how to page this.
     function loaderFunction(page) {
+
       var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/observations.json"
       url += "?rows_dimension=" + encodeURIComponent(rowsDimension);
       url += "&columns_dimension=" + encodeURIComponent(columnsDimension);
+      url += "&per_page=" + PAGESIZE.toString();
+      url += "&page=" + (page+1).toString(); // 1 based pages on server
+
+      if (orderDesc) {
+        url += "order_desc=true";
+      }
+
+      if (orderByColumn) {
+        url += "order_by_column=" + encodeURIComponent(orderByColumn);
+      }
 
       for (var lockedDimension in lockedDimensions) {
         var dimensionVal = lockedDimensions[lockedDimension];
@@ -215,9 +225,9 @@
 
       console.log('gridSize ' + gridSize.toString());
 
-      getRowLabels(); // sets a top-level var.
+      //getRowLabels(); // sets a top-level var.
 
-      loader = new Slick.Data.DataLoader(gridSize, gridSize);
+      loader = new Slick.Data.DataLoader(gridSize, PAGESIZE);
       grid = new Slick.Grid("#myGrid", loader.data, columns, options);
 
       loader.onDataLoading.subscribe(function () {
@@ -255,39 +265,7 @@
         var sortdir = args.sortAsc ? 1 : -1;
         var sortcol = args.sortCol.field;
 
-        // THIS SORTS THE RAW DATA,
-        // BUT AS IT'S LINKS THAT DOESN'T WORK - it sorts the anchors!
-        // IDEA: DO SORTING ON SERVER, OR USE A CUSTOM DATAVIEW INSTEAD OF AN ARRAY?
-
-        // var gridData = loader.data;
-        // var gridDataArray = [];
-
-        // // assign back into loader data.
-        // for (var i=0; i< loader.data.length; i++) {
-        //   gridDataArray[i] = loader.data[i];
-        // }
-
-        // function comparer(a, b) {
-        //   var x = a[sortcol], y = b[sortcol];
-        //   return (x == y ? 0 : (x > y ? 1 : -1));
-        // }
-
-        // function sort(array, comparer, ascending) {
-        //   array.sort(comparer);
-        //   if(ascending) {
-        //     array.reverse();
-        //   }
-        // }
-
-        // sort(gridDataArray, comparer, args.sortAsc);
-
-        // // assign back into loader data.
-        // for (var i=0; i< loader.data.length; i++) {
-        //   gridData[i] = gridDataArray[i];
-        // }
-
-        // grid.setData(gridData);
-        // grid.render();
+        // redo query and re-populate grid.
       });
 
     }
