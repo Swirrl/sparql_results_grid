@@ -5,25 +5,24 @@
     var self = this;
     var pageSize = pageSize;
     var data = {length: 0}; // the data rows, which we'll fill in, plus an extra property for total length
-    var sparqlQuery = null;
     var pagesToLoad = {};
 
     // events
     var onDataLoading = new Slick.Event();
     var onDataLoaded = new Slick.Event();
+    var onPageLoading = new Slick.Event();
+    var onPageLoaded = new Slick.Event();
 
     function clear() {
       for (var key in data) {
         delete data[key];
       }
       data.length = totalCount;
+      pagesToLoad = {};
     }
 
     // from and to are 0-based row indices.
     function ensureData(from, to, loaderFunction){
-
-      console.log('Ensuring data for rows');
-      console.log("from: " + from.toString() + " to: " + to.toString());
 
       data.length = totalCount;
 
@@ -34,6 +33,9 @@
         to = data.length -1;
       }
 
+      // tell the world we're trying to load.
+      onDataLoading.notify({from: from, to: to});
+
       var fromPage = Math.floor(from / pageSize);
       var toPage = Math.floor(to / pageSize);
 
@@ -43,28 +45,14 @@
         }
       }
 
-      console.log("pages to load:");
-      console.log(pagesToLoad);
-      console.log('from page: ' + fromPage);
-      console.log('to page: ' + toPage);
-
-
       // do a bunch of queries to get the data for the range.
       for (var page = fromPage; page <= toPage; page++ ){
-
-        console.log("PAGE: " + page.toString());
-
         if (pagesToLoad[page] == null) {
-          console.log('CALLING PAGE LOADER');
+          console.log('loading a page');
+          onPageLoading.notify({page: page});
           loaderFunction.call(self, page);
-        } else {
-          console.log('PAGE ALREADY LOADED!!!');
         }
       }
-
-      // tell the world we're trying to load.
-      onDataLoading.notify({from: from, to: to});
-
     }
 
     // given a page index, and an array of row data, set the data for the page
@@ -86,6 +74,7 @@
         data[thisPageFrom + i]["__row_num"] = rowNum;
       }
 
+      onPageLoaded.notify({page: page});
       onDataLoaded.notify({from: thisPageFrom, to: thisPageTo});
     }
 
@@ -101,6 +90,8 @@
       // events
       "onDataLoading": onDataLoading,
       "onDataLoaded": onDataLoaded,
+      "onPageLoading": onPageLoading,
+      "onPageLoaded": onPageLoaded
     };
   }
 

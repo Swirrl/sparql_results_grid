@@ -10,6 +10,9 @@
     This example loads 2 dimensions of a cube.
   </div>
   <div id="myGrid" style="width:90%;height:490px;"></div>
+  <div class="grid-footer" style="width:90%;height:30px;">
+    <div class="grid-status"><div class="status">Status:</div> <div class='status-value'></div> <img class="busy" src="images/ajax-loader-small.gif" alt="busy" style="display:none;"></div>
+  </div>
 </table>
 
 <script type="text/javascript" src="js/jquery-1.7.min.js"></script>
@@ -23,9 +26,9 @@
     var grid;
     var loader;
     var SITEDOMAIN = 'odc.dev';
-    var PAGESIZE = 20;
+    var PAGESIZE = 25;
 
-    var options = {
+    var gridOptions = {
       enableCellNavigation: false,
       enableColumnReorder: false,
       syncColumnCellResize: true,
@@ -34,26 +37,28 @@
 
     var columnWidth = 350;
     var gridSize;
-   // var rowLabels = {}; //'hash' of uris to labels
-
-    var datasetSlug = "additional-affordable-dwellings" ;
-    var rowsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refArea";
-    var rowsDimensionLabel = "Reference Area";
-    var columnsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refPeriod";
-    var lockedDimensions = {
-      "http://opendatacommunities.org/def/housing/affordableHousingType": "http://opendatacommunities.org/def/housing/concept/affordable-housing-type/social-rent"
-    }
+    var columns;
     var orderByColumn = null; // order by rows by default
     var orderDesc = false; // order asc by default
 
+    var loadingPages = 0;
 
-    // var datasetSlug = "wellbeing-lsoa-happy-yesterday-mean";
+    // var datasetSlug = "additional-affordable-dwellings" ;
     // var rowsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refArea";
     // var rowsDimensionLabel = "Reference Area";
-    // var columnsDimension = "http://opendatacommunities.org/def/wellbeing/wellbeingQuestion";
+    // var columnsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refPeriod";
     // var lockedDimensions = {
-    //   "http://purl.org/linked-data/sdmx/2009/dimension#refPeriod": "http://reference.data.gov.uk/id/government-year/2011-2012"
+    //   "http://opendatacommunities.org/def/housing/affordableHousingType": "http://opendatacommunities.org/def/housing/concept/affordable-housing-type/social-rent"
     // }
+
+    var datasetSlug = "wellbeing-lsoa-happy-yesterday-mean";
+    var rowsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refArea";
+    var rowsDimensionLabel = "Reference Area";
+    var columnsDimension = "http://opendatacommunities.org/def/wellbeing/wellbeingQuestion";
+    var lockedDimensions = {
+      "http://purl.org/linked-data/sdmx/2009/dimension#refPeriod": "http://reference.data.gov.uk/id/government-year/2011-2012"
+    }
+
 
     function getColumns() {
 
@@ -63,12 +68,11 @@
 
       var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_values.json?dimension=" + encodeURIComponent(columnsDimension);
 
-      // row numbers.
-      var columns = [{id: '__row_num', field: '__row_num', name: '#', width: 60, cssClass: 'row-num' }];
+      // start with row numbers (notice we're setting the top-level var).
+      columns = [{id: '__row_num', field: '__row_num', name: '#', width: 60, cssClass: 'row-num' }];
 
       $.ajax({
         dataType: 'json',
-        async: false,
         url: url,
         success: function(responseData, textStatus, jqXHR) {
           console.log('cols success');
@@ -84,66 +88,35 @@
             columns.push({id: columnUri, name: columnLink, field: columnUri, width: columnWidth, sortable:true, formatter: rawFormatter });
           }
 
+          gridColsReady.notify();
+
         },
         error: function() {
           alert("error loading columns");
         }
       });
-
-      return columns;
-
+      return null;
     }
-
-    // function getRowLabels() {
-
-    //   console.log('getting row labels');
-
-    //   var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_values.json?dimension=" + encodeURIComponent(rowsDimension);
-
-    //   $.ajax({
-    //     dataType: 'json',
-    //     async: false,
-    //     url: url,
-    //     success: function(responseData, textStatus, jqXHR) {
-    //       console.log('rows success');
-    //       var start = new Date();
-
-    //       for (var i=0; i < responseData.length; i++) {
-    //         var row = responseData[i];
-    //         var uri = row["uri"];
-    //         var label = row["label"];
-    //         rowLabels[uri] = label;
-    //       }
-    //       console.log( 'processed row labels in: ' + (new Date() - start) + 'ms');
-    //     },
-    //     error: function() {
-    //       alert("error loading columns");
-    //     }
-    //   });
-
-    //   console.log('got row labels');
-
-    // }
 
     function getGridSize() {
 
       console.log('in get grid size');
       var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_size.json?dimension=" + encodeURIComponent(rowsDimension);
 
-      var gridSize = 0;
+      // notice we're setting the top-level variable.
+      gridSize = 0;
       $.ajax({
         dataType: 'json',
-        async: false,
         url: url,
         success: function(responseData, textStatus, jqXHR) {
           gridSize = responseData['size'];
+          gridSizeCalculated.notify();
         },
         error: function() {
           alert("error loading columns");
         }
       });
-
-      return gridSize;
+      return null;
     }
 
     // deals with data coming back from the loaderFunction's ajax call.
@@ -183,6 +156,21 @@
       return processedData;
     }
 
+    function checkLoadingPages() {
+      console.log('no of loading pages');
+      console.log(loadingPages);
+      if (loadingPages == 0) {
+        setStatus('Ready.', false);
+      } else {
+        setStatus('Loading data...', true);
+      }
+    }
+
+    function incrementloadingPages(byAmount){
+      loadingPages += byAmount;
+      checkLoadingPages();
+    }
+
     // at the moment, assume this gets all the data for the whole grid.
     // TODO: work out how to page this.
     function loaderFunction(page) {
@@ -194,11 +182,11 @@
       url += "&page=" + (page+1).toString(); // 1 based pages on server
 
       if (orderDesc) {
-        url += "order_desc=true";
+        url += "&order_desc=true";
       }
 
       if (orderByColumn) {
-        url += "order_by_column=" + encodeURIComponent(orderByColumn);
+        url += "&order_by_column=" + encodeURIComponent(orderByColumn);
       }
 
       for (var lockedDimension in lockedDimensions) {
@@ -216,35 +204,44 @@
       });
 
       req.page = page; // add a page property onto the jqXHR obj
+
+    }
+
+    function setStatus(status, busy) {
+      $(".grid-footer .grid-status .status-value").empty();
+      $(".grid-footer .grid-status .status-value").append(status);
+
+      if (busy) {
+        $(".grid-footer img.busy").show();
+      } else {
+        $(".grid-footer img.busy").hide();
+      }
+
     }
 
     function initGridAndLoader() {
 
-      var gridSize = getGridSize();
-      var columns = getColumns();
-
-      console.log('gridSize ' + gridSize.toString());
-
-      //getRowLabels(); // sets a top-level var.
-
       loader = new Slick.Data.DataLoader(gridSize, PAGESIZE);
-      grid = new Slick.Grid("#myGrid", loader.data, columns, options);
+      grid = new Slick.Grid("#myGrid", loader.data, columns, gridOptions);
 
-      loader.onDataLoading.subscribe(function () {
-        // TODO... show spinner.
-        console.log('loading...');
+      loader.onPageLoading.subscribe(function (e, args) {
+        incrementloadingPages(+1);
+      });
+
+      loader.onPageLoaded.subscribe(function (e, args) {
+        incrementloadingPages(-1);
+      });
+
+      loader.onDataLoading.subscribe(function (e, args) {
+        // don't do anything
       });
 
       loader.onDataLoaded.subscribe(function (e, args) {
-        console.log(args);
         for (var i = args.from; i <= args.to; i++) {
           grid.invalidateRow(i); // causes the appropriate rows to redraw.
         }
-
         grid.updateRowCount(); // uses data.length
         grid.render();
-        //TODO: hide spinner.
-        console.log('loaded');
       });
 
       var viewportChangedTimer;
@@ -254,25 +251,51 @@
         // only fire this every 1/4 sec at most.
         viewportChangedTimer = setTimeout( function() {
           console.log('calling ensureData');
-          var vp = grid.getViewport();
-          loader.ensureData(vp.top, vp.bottom, loaderFunction);
+          loader.ensureData(grid.getViewport().top, grid.getViewport().bottom, loaderFunction);
          }, 250);
       });
 
       grid.onSort.subscribe(function (e, args) {
+        orderByColumn = args.sortCol.field;
+        orderDesc = args.sortAsc ? false : true;
 
-
-        var sortdir = args.sortAsc ? 1 : -1;
-        var sortcol = args.sortCol.field;
-
-        // redo query and re-populate grid.
+        loader.clear();
+        grid.setData(loader.data, true);
+        loader.ensureData(grid.getViewport().top, grid.getViewport().bottom, loaderFunction);
       });
+
+      loader.ensureData(grid.getViewport().top, grid.getViewport().bottom, loaderFunction);
 
     }
 
-    initGridAndLoader();
-    var vp = grid.getViewport();
-    loader.ensureData(vp.top, vp.bottom, loaderFunction);
+    function initGridAndLoaderWhenReady() {
+      // when everything is ready, init the grid.
+      if (gridColsReadyRaised && gridSizeCalculatedRaised) {
+        initGridAndLoader();
+      }
+    }
+
+    var gridColsReadyRaised = false;
+    var gridSizeCalculatedRaised = false;
+
+    var gridColsReady = new Slick.Event();
+    var gridSizeCalculated = new Slick.Event();
+
+    gridColsReady.subscribe(function( e, args ) {
+      gridColsReadyRaised = true;
+      initGridAndLoaderWhenReady();
+    });
+
+    gridSizeCalculated.subscribe(function(e, args) {
+      gridSizeCalculatedRaised = true;
+      initGridAndLoaderWhenReady();
+    });
+
+    setStatus('Initializing grid...', true);
+    grid = new Slick.Grid("#myGrid", [], [], gridOptions);
+
+    getColumns();
+    getGridSize();
 
   });
 </script>

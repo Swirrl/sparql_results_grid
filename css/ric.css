@@ -2,7 +2,7 @@ body {
   font-family: 'Helvetica Neue', Helvetica, Arial;
   font-size: 10pt;
   background: #fafafa;
-  font-color: #222;
+  font-color: #333;
   padding: 0;
   margin: 8;
 }
@@ -10,7 +10,7 @@ body {
 #myGrid {
   background: white;
   outline: 0;
-  border: 1px solid gray;
+  border: 1px solid #bbb;
 }
 
 .slick-cell.row-num {
@@ -33,3 +33,19 @@ body {
   border-bottom: 1px solid silver !important;
 }
 
+.grid-footer {
+  background: #f3f3f3;
+  width: 90%;
+  border: 1px solid #bbb;
+  outline: 0px;
+  border-top: 0px;
+}
+
+.grid-footer .grid-status {
+  padding: 8px;
+}
+
+.grid-status div {
+  float:left;
+  margin-right: 5px;
+}
