@@ -42,9 +42,17 @@
 <script type="text/javascript">
   $(function() {
 
-    // CONSTANTS
-    var SITEDOMAIN = 'odc.dev';
-    var PAGESIZE = 25;
+    // set some globally accessible config.
+    var siteDomain = 'odc.dev'
+      , datasetSlug = 'additional-affordable-dwellings'
+      , pageSize = 25
+      , elementSelector = "#myGrid"
+      ;
+
+    //--------------
+
+    var cubeGrid = new Swirrl.CubeGrid(elementSelector, siteDomain, datasetSlug, pageSize)
+
 
     // EVENTS
     var gridColsReady = new Slick.Event();
@@ -110,7 +118,7 @@
       }
     }
 
-    function populateDimenionValueDropDown(selector, dimension) {
+    function populateDimensionValueDropDown(selector, dimension) {
 
       console.log('populating the dimvalue drop down');
       console.log(selector);
@@ -178,7 +186,7 @@
         $("div.locked-dimensions").append(dimValueSelect);
         $("div.locked-dimensions").append("<br/>");
 
-        populateDimenionValueDropDown( dimValueSelect, lockedDim );
+        populateDimensionValueDropDown( dimValueSelect, lockedDim );
       }
 
       // populate all the dimension dropdowns

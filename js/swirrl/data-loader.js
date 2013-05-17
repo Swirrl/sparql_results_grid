@@ -13,6 +13,10 @@
     var onPageLoading = new Slick.Event();
     var onPageLoaded = new Slick.Event();
 
+    function getData() {
+      return data;
+    }
+
     function clear() {
       for (var key in data) {
         delete data[key];
@@ -80,10 +84,8 @@
 
     // public api.
     return {
-      // properties
-      "data": data,
-
       // methods
+      "getData": getData,
       "clear": clear,
       "ensureData": ensureData,
       "setPageOfData": setPageOfData,
