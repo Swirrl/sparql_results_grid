@@ -30,14 +30,14 @@
 <script type="text/javascript" src="js/jquery-1.7.min.js"></script>
 <script type="text/javascript" src="js/jquery.event.drag-2.2.js"></script>
 <script type="text/javascript" src="js/slick.core.js"></script>
-<script type="text/javascript" src="js/slick.data-loader.js"></script>
 <script type="text/javascript" src="js/slick.grid.js"></script>
+<script type="text/javascript" src="js/swirrl/data-loader.js"></script>
 <script type="text/javascript">
   $(function() {
     var grid;
     var loader;
     var SPARQLENDPOINT = 'http://opendatacommunities.org/sparql';
-    var PAGESIZE = 1000;
+    var PAGESIZE = 500;
     var sparqlQuery;
     var columnWidth = 350;
     var columns = [];
@@ -95,7 +95,7 @@
         callbackParameter: "callback",
         success: ajaxSuccess,
         error: function() {
-          alert("error loading page " + page);
+          console.log('error loading page ' + page.toString());
         }
       });
       req.page = page; // ad a property onto teh jqXHR obj
@@ -105,7 +105,7 @@
       columns = [];
       var gridSize = parseInt($("#grid-size").val());
       console.log(gridSize);
-      loader = new Slick.Data.DataLoader(gridSize, PAGESIZE);
+      loader = new Swirrl.DataLoader(gridSize, PAGESIZE);
       grid = new Slick.Grid("#myGrid", loader.data, [], options);
 
 

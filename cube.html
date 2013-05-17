@@ -6,9 +6,24 @@
   <link rel="stylesheet" href="css/ric.css" type="text/css"/>
 </head>
 <body>
-  <div>
-    This example loads 2 dimensions of a cube.
+  <h1>Cube Viewer</h1>
+  <h3>Rows and Columns</h3>
+  Rows:
+  <select id="rows-dropdown" class="dimension-dropdown">
+  </select>
+  <br/>
+
+  Columns:
+  <select id="columns-dropdown" class="dimension-dropdown">
+  </select>
+
+  <h3>Other dimensions</h3>
+  <div class="locked-dimensions">
+    <!-- this will be filled in with the other dimensions -->
   </div>
+
+  <br/>
+
   <div id="myGrid" style="width:90%;height:490px;"></div>
   <div class="grid-footer" style="width:90%;height:30px;">
     <div class="grid-status"><div class="status">Status:</div> <div class='status-value'></div> <img class="busy" src="images/ajax-loader-small.gif" alt="busy" style="display:none;"></div>
@@ -18,15 +33,23 @@
 <script type="text/javascript" src="js/jquery-1.7.min.js"></script>
 <script type="text/javascript" src="js/jquery.event.drag-2.2.js"></script>
 <script type="text/javascript" src="js/slick.core.js"></script>
-<script type="text/javascript" src="js/slick.data-loader.js"></script>
 <script type="text/javascript" src="js/slick.grid.js"></script>
+
+<script type="text/javascript" src="js/swirrl/data-loader.js"></script>
+<script type="text/javascript" src="js/swirrl/cube-grid.js"></script>
+<script type="text/javascript" src="js/swirrl/cube-dimension.js"></script>
+
 <script type="text/javascript">
   $(function() {
 
-    var grid;
-    var loader;
+    // CONSTANTS
     var SITEDOMAIN = 'odc.dev';
     var PAGESIZE = 25;
+
+    // EVENTS
+    var gridColsReady = new Slick.Event();
+    var gridSizeCalculated = new Slick.Event();
+    var dimensionsRetrieved = new Slick.Event();
 
     var gridOptions = {
       enableCellNavigation: false,
@@ -35,13 +58,18 @@
       rowHeight: 24
     };
 
+    // some top-level closure-level variables.
+    var grid;
+    var loader;
     var columnWidth = 350;
     var gridSize;
     var columns;
     var orderByColumn = null; // order by rows by default
     var orderDesc = false; // order asc by default
-
     var loadingPages = 0;
+    var dimensions = []; // array of objects with {uri: http//dim-uri, label: dim-label}
+
+    // HARD-CODED (for now) dimensions.
 
     var datasetSlug = "additional-affordable-dwellings" ;
     var rowsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refArea";
@@ -59,25 +87,157 @@
     //   "http://purl.org/linked-data/sdmx/2009/dimension#refPeriod": "http://reference.data.gov.uk/id/government-year/2011-2012"
     // }
 
-
     function buildCellLink(uri, text) {
-
       var url = uri;
 
       // if string doesn't start with this domain, use the resource= style
       if(url.indexOf('http://' + SITEDOMAIN) != 0) {
         url = 'http://' + SITEDOMAIN + '/resource?uri=' + encodeURIComponent(uri);
       }
-
-      return "<a class='cell-link' href='" + url + "'>" + text + "</a>";
+      return "<a class='cell-link' target='_blank' href='" + url + "'>" + text + "</a>";
     }
 
+    function populateDimensionDropDown(selector) {
+      var select = $(selector);
+      select.empty();
+
+      for (var i=0; i< dimensions.length; i++) {
+        var dimension = dimensions[i];
+        var option = $("<option></option>");
+        option.attr("value", dimension["uri"] );
+        option.append(dimension["label"] || dimension["uri"]) ;
+        select.append(option);
+      }
+    }
+
+    function populateDimenionValueDropDown(selector, dimension) {
+
+      console.log('populating the dimvalue drop down');
+      console.log(selector);
+      console.log(dimension);
+
+      var select = $(selector);
+      select.empty();
+
+      // TODO: memoize the dimension values, so we don't need to go get them if we already know them.
+
+      // need to go  and get all the possible values for this dimension (if not got already).
+      var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_values.json?dimension=" + encodeURIComponent(dimension);
+
+      $.ajax({
+        url: url,
+        success: function(responseData, textStatus, jqXHR) {
+          console.log(responseData);
+          for (var i=0; i < responseData.length; i++) {
+
+            var dimensionValue = responseData[i];
+            console.log(dimensionValue);
+
+            var dimValueUri = dimensionValue["uri"];
+            var dimValueLabel = dimensionValue["label"] || dimensionValue["uri"];
+            var option = $("<option></option>");
+            option.attr("value", dimValueUri);
+            option.append(dimValueLabel || dimValueUri);
+            select.append(option);
+          }
+        },
+        error: function() {
+          console.log('error getting dimension values');
+        }
+      });
+    }
+
+    function setDimensionDropDownValue(selector, value) {
+      var select = $(selector);
+      select.val(value);
+    }
+
+    function generateLockedDimensionDropDownId(dimensionUri, isValue) {
+      var escapedDimensionUri = dimensionUri.replace(/[^a-zA-Z0-9\-\_]/gi, "-");
+      var theId = encodeURI(escapedDimensionUri).toString();
+      theId += '-dimension';
+      if(isValue) {
+        theId += '-value';
+      }
+      return theId;
+    }
+
+    function setupDimensionDropDowns(){
+
+      // create the 'other dimensions' dropdowns
+      for (var lockedDim in lockedDimensions) {
+        var dimSelect = $("<select><select>");
+        dimSelect.addClass("dimension-dropdown");
+        dimSelect.attr('id', generateLockedDimensionDropDownId(lockedDim, false));
+        $("div.locked-dimensions").append(dimSelect);
+        $("div.locked-dimensions").append(": ");
+
+        var dimValueSelect = $("<select><select>");
+        dimValueSelect.addClass("dimension-value-dropdown");
+        dimValueSelect.attr('id', generateLockedDimensionDropDownId(lockedDim, true));
+        $("div.locked-dimensions").append(dimValueSelect);
+        $("div.locked-dimensions").append("<br/>");
+
+        populateDimenionValueDropDown( dimValueSelect, lockedDim );
+      }
+
+      // populate all the dimension dropdowns
+      $("select.dimension-dropdown").each(function(i, el) {
+        populateDimensionDropDown(el);
+      });
+
+      // set values of rows and columns
+      setDimensionDropDownValue("select#rows-dropdown", rowsDimension);
+      setDimensionDropDownValue("select#columns-dropdown", columnsDimension);
+
+      // set values of other dimensions
+      for (var lockedDim in lockedDimensions) {
+
+        var lockedDimValue = lockedDimensions[lockedDim];
+
+        console.log(lockedDim);
+        console.log(lockedDimValue);
+
+        var dimSelectSelector = "#" + generateLockedDimensionDropDownId(lockedDim, false);
+        var dimValueSelectSelector = "#" + generateLockedDimensionDropDownId(lockedDim, true)
+
+        console.log(dimSelectSelector);
+        console.log(dimValueSelectSelector);
+
+        var dimSelect = $(dimSelectSelector);
+        var dimValueSelect = $(dimValueSelectSelector);
+
+        setDimensionDropDownValue(dimSelect, lockedDim);
+        setDimensionDropDownValue(dimValueSelect, lockedDimValue);
+      }
+
+    }
+
+    function getAllDimensions(){
+      console.log('in get all dimensions');
+
+      var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimensions.json"
+
+      $.ajax({
+        dataType: 'json',
+        url: url,
+        success: function(responseData, textStatus, jqXHR) {
+          dimensions = responseData; // set the top-level var.
+          console.log(dimensions);
+          dimensionsRetrieved.notify();
+        },
+        error: function() {
+          console.log('error loading columns');
+        }
+      });
+    }
 
     function getColumns() {
-
       function rawFormatter(row, cell, value, columnDef, dataContext) {
         return value;
       }
+
+      // TODO: memoize dimension values.
 
       var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_values.json?dimension=" + encodeURIComponent(columnsDimension);
 
@@ -103,14 +263,13 @@
 
         },
         error: function() {
-          alert("error loading columns");
+          console.log('error loading columns');
         }
       });
       return null;
     }
 
     function getGridSize() {
-
       console.log('in get grid size');
       var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_size.json?dimension=" + encodeURIComponent(rowsDimension);
 
@@ -124,7 +283,7 @@
           gridSizeCalculated.notify();
         },
         error: function() {
-          console.log('error loading cols');
+          console.log('error loading grid size');
         }
       });
       return null;
@@ -232,7 +391,7 @@
 
     function initGridAndLoader() {
 
-      loader = new Slick.Data.DataLoader(gridSize, PAGESIZE);
+      loader = new Swirrl.DataLoader(gridSize, PAGESIZE);
       grid = new Slick.Grid("#myGrid", loader.data, columns, gridOptions);
       grid.setSortColumn(rowsDimension, true); // start it off being sorted by row dimension, asc.
 
@@ -308,10 +467,7 @@
     var gridColsReadyRaised = false;
     var gridSizeCalculatedRaised = false;
 
-    var gridColsReady = new Slick.Event();
-    var gridSizeCalculated = new Slick.Event();
-
-    gridColsReady.subscribe(function( e, args ) {
+    gridColsReady.subscribe(function(e, args) {
       gridColsReadyRaised = true;
       initGridAndLoaderWhenReady();
     });
@@ -321,9 +477,14 @@
       initGridAndLoaderWhenReady();
     });
 
+    dimensionsRetrieved.subscribe(function(e, args) {
+      setupDimensionDropDowns();
+    });
+
     setStatus('Initializing grid...', true);
     grid = new Slick.Grid("#myGrid", [], [], gridOptions);
 
+    getAllDimensions();
     getColumns();
     getGridSize();
 

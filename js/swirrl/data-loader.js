@@ -78,6 +78,7 @@
       onDataLoaded.notify({from: thisPageFrom, to: thisPageTo});
     }
 
+    // public api.
     return {
       // properties
       "data": data,
@@ -95,6 +96,6 @@
     };
   }
 
-  // Slick.Data.DataLoader
-  $.extend(true, window, { Slick: { Data: { DataLoader: DataLoader }}});
+  // Swirrl.DataLoader
+  $.extend(true, window, { Swirrl: { DataLoader: DataLoader }});
 })(jQuery);
