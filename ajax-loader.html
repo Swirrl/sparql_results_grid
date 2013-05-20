@@ -109,7 +109,7 @@
       grid = new Slick.Grid("#myGrid", loader.data, [], options);
 
 
-      loader.onDataLoading.subscribe(function () {
+      loader.onDataLoading.subscribe(function (e, args) {
         // TODO... show spinner.
         console.log('loading...');
       });

@@ -6,12 +6,38 @@
     var pageSize = pageSize;
     var data = {length: 0}; // the data rows, which we'll fill in, plus an extra property for total length
     var pagesToLoad = {};
+    var loadingPages = 0; // number of pages currently being loaded by loader.
 
     // events
+    //////////////////
+
     var onDataLoading = new Slick.Event();
     var onDataLoaded = new Slick.Event();
     var onPageLoading = new Slick.Event();
     var onPageLoaded = new Slick.Event();
+    var onReady = new Slick.Event();
+    var onBusy = new Slick.Event();
+
+    // some setup
+
+    // subscribe to some grid and loader events.
+    onPageLoading.subscribe(function (e, args) {
+      if (loadingPages == 0) {
+        onBusy.notify();
+      }
+      loadingPages ++;
+    });
+
+    onPageLoaded.subscribe(function (e, args) {
+      loadingPages --;
+      if(loadingPages == 0) {
+        onReady.notify();
+      }
+    });
+
+
+    // private funcs
+    //////////////////
 
     function getData() {
       return data;
@@ -52,7 +78,6 @@
       // do a bunch of queries to get the data for the range.
       for (var page = fromPage; page <= toPage; page++ ){
         if (pagesToLoad[page] == null) {
-          console.log('loading a page');
           onPageLoading.notify({page: page});
           loaderFunction.call(self, page);
         }
@@ -83,18 +108,24 @@
     }
 
     // public api.
+    //////////////////
+
     return {
+
+      "data": data
+
       // methods
-      "getData": getData,
-      "clear": clear,
-      "ensureData": ensureData,
-      "setPageOfData": setPageOfData,
+    , "clear": clear
+    , "ensureData": ensureData
+    , "setPageOfData": setPageOfData
 
       // events
-      "onDataLoading": onDataLoading,
-      "onDataLoaded": onDataLoaded,
-      "onPageLoading": onPageLoading,
-      "onPageLoaded": onPageLoaded
+    , "onDataLoading": onDataLoading
+    , "onDataLoaded": onDataLoaded
+    , "onPageLoading": onPageLoading
+    , "onPageLoaded": onPageLoaded
+    , "onReady": onReady
+    , "onBusy": onBusy
     };
   }
 

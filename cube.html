@@ -42,16 +42,56 @@
 <script type="text/javascript">
   $(function() {
 
-    // set some globally accessible config.
     var siteDomain = 'odc.dev'
       , datasetSlug = 'additional-affordable-dwellings'
       , pageSize = 25
       , elementSelector = "#myGrid"
+      , cubeDimensions = null
       ;
 
-    //--------------
+    function setStatus(status, busy) {
+      $(".grid-footer .grid-status .status-value").empty();
+      $(".grid-footer .grid-status .status-value").append(status);
+
+      if (busy) {
+        $(".grid-footer img.busy").show();
+      } else {
+        $(".grid-footer img.busy").hide();
+      }
+    }
+
+    setStatus('Initializing grid...', true);
 
     var cubeGrid = new Swirrl.CubeGrid(elementSelector, siteDomain, datasetSlug, pageSize)
+
+    cubeGrid.onGridReady.subscribe(function (e, args) {
+      setStatus("Ready.", false)
+    });
+
+    cubeGrid.onGridGettingData.subscribe(function (e, args) {
+      setStatus("Getting data...", true)
+    });
+
+    cubeGrid.onCubeDimensionsReady.subscribe(function (e, args) {
+      cubeDimensions = args.cubeDimensions;
+
+      cubeGrid.setLockedDimensionValue(
+        "http://opendatacommunities.org/def/housing/affordableHousingType",
+        "http://opendatacommunities.org/def/housing/concept/affordable-housing-type/social-rent"
+      );
+
+      // for now - hard code the dimensions.
+      cubeGrid.setColumnsDimension(cubeDimensions[0]);
+      cubeGrid.setRowsDimension(cubeDimensions[1]);
+
+    });
+
+    cubeGrid.getAllDimensionsAsync();
+
+    // quit!
+    return;
+
+    // old....
 
 
     // EVENTS
@@ -257,6 +297,7 @@
         url: url,
         success: function(responseData, textStatus, jqXHR) {
           var rowDimensionLink = buildCellLink(rowsDimension, rowsDimensionLabel); //"<a href='" + rowsDimension + "'>" + rowsDimensionLabel + "</a>";
+
           // start with just the row dimension
           columns.push({id: rowsDimension, name: rowDimensionLink, field: rowsDimension, width: columnWidth, sortable:true, formatter: rawFormatter });
 
@@ -349,8 +390,6 @@
       checkLoadingPages();
     }
 
-    // at the moment, assume this gets all the data for the whole grid.
-    // TODO: work out how to page this.
     function loaderFunction(page) {
 
       var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/observations.json"

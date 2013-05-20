@@ -3,18 +3,22 @@
   function CubeDimension(uri, label, urlBase) {
 
     // private vars
+    //////////////////
+
     var size = null
       , values = null // will contain an array of objects with uri and label keys
-      , sizeReady = new Slick.Event()
-      , valuesReady = new Slick.Event()
+      , onSizeReady = new Slick.Event()
+      , onValuesReady = new Slick.Event()
       ;
 
     // private functions.
+    //////////////////
+
     function getUri() {
       return uri;
     }
 
-    // private functions.
+
     function getLabel() {
       return label;
     }
@@ -26,11 +30,11 @@
           url: urlBase + "/dimension_size.json?dimension=" + encodeURIComponent(uri),
           success: function(responseData, _, _) {
             size = responseData['size'];
-            sizeReady.notify({size: size});
+            onSizeReady.notify({size: size});
           }
         });
       } else {
-        sizeReady.notify({size: size});
+        onSizeReady.notify({size: size});
       }
     }
 
@@ -41,25 +45,30 @@
           url: urlBase + "/dimension_values.json?dimension=" + encodeURIComponent(uri),
           success: function(responseData, _, _) {
             values = responseData;
-            valuesReady.notify({values: values});
+            onValuesReady.notify({values: values});
           }
         });
       } else {
-        valuesReady.notify({values: values});
+        onValuesReady.notify({values: values});
       }
     }
 
     // public api.
+    //////////////////
+
     return {
+
+      //properties
+      "label": label
+    , "uri": uri
+
       // methods
-    , "getLabel": getLabel
-    , "getUri": getUri
-    , "getSizeAsync": getSizeAsync // raises the sizeReady event, with the size as the arg.
-    , "getValuesAsync": getValuesAsync // raises the valuesReady event with the values as the arg.
+    , "getSizeAsync": getSizeAsync // raises the onSizeReady event, with the size as the arg.
+    , "getValuesAsync": getValuesAsync // raises the onValuesReady event with the values as the arg.
 
       // events
-    , "sizeReady": sizeReady
-    , "valuesReady": valuesReady // contains the new values.
+    , "onSizeReady": onSizeReady
+    , "onValuesReady": onValuesReady // contains the new values.
     };
   }
 
