@@ -7,19 +7,22 @@
 </head>
 <body>
   <h1>Cube Viewer</h1>
-  <h3>Rows and Columns</h3>
-  Rows:
-  <select id="rows-dropdown" class="dimension-dropdown">
-  </select>
-  <br/>
 
-  Columns:
-  <select id="columns-dropdown" class="dimension-dropdown">
-  </select>
+  <div id="dimensions-controls">
+    <h3>Rows and Columns</h3>
+    Rows:
+    <select id="rows-dropdown" class="dimension-dropdown">
+    </select>
+    <br/>
 
-  <h3>Other dimensions</h3>
-  <div class="locked-dimensions">
-    <!-- this will be filled in with the other dimensions -->
+    Columns:
+    <select id="columns-dropdown" class="dimension-dropdown">
+    </select>
+
+    <h3>Other dimensions</h3>
+    <div class="locked-dimensions">
+      <!-- this will be filled in with the other dimensions -->
+    </div>
   </div>
 
   <br/>
@@ -38,6 +41,8 @@
 <script type="text/javascript" src="js/swirrl/data-loader.js"></script>
 <script type="text/javascript" src="js/swirrl/cube-grid.js"></script>
 <script type="text/javascript" src="js/swirrl/cube-dimension.js"></script>
+<script type="text/javascript" src="js/swirrl/cube-dimension-dropdown.js"></script>
+<script type="text/javascript" src="js/swirrl/cube-dimensions-controls.js"></script>
 
 <script type="text/javascript">
   $(function() {
@@ -47,6 +52,7 @@
       , pageSize = 25
       , elementSelector = "#myGrid"
       , cubeDimensions = null
+      , cubeDimensionsControls = null
       ;
 
     function setStatus(status, busy) {
@@ -60,9 +66,12 @@
       }
     }
 
+    // set initial status
     setStatus('Initializing grid...', true);
 
+    // Construct a grid. This will populate itself when it has enough data.
     var cubeGrid = new Swirrl.CubeGrid(elementSelector, siteDomain, datasetSlug, pageSize)
+
 
     cubeGrid.onGridReady.subscribe(function (e, args) {
       setStatus("Ready.", false)
@@ -73,6 +82,7 @@
     });
 
     cubeGrid.onCubeDimensionsReady.subscribe(function (e, args) {
+
       cubeDimensions = args.cubeDimensions;
 
       cubeGrid.setLockedDimensionValue(
@@ -80,9 +90,14 @@
         "http://opendatacommunities.org/def/housing/concept/affordable-housing-type/social-rent"
       );
 
-      // for now - hard code the dimensions.
+      // for now - hard code the initial dimensions.
       cubeGrid.setColumnsDimension(cubeDimensions[0]);
       cubeGrid.setRowsDimension(cubeDimensions[1]);
+
+      console.log(cubeGrid.getCubeDimensions());
+
+      // object to marshall communication between the grid and all the dimension controls
+      var cubeDimensionsControls = new Swirrl.CubeDimensionsControls(cubeGrid, "#dimensions-controls");
 
     });
 
@@ -91,7 +106,7 @@
     // quit!
     return;
 
-    // old....
+    // old stuff follows...
 
 
     // EVENTS

@@ -14,15 +14,6 @@
     // private functions.
     //////////////////
 
-    function getUri() {
-      return uri;
-    }
-
-
-    function getLabel() {
-      return label;
-    }
-
     // memoized lookup of the size of this dimension.
     function getSizeAsync() {
       if (!size) {

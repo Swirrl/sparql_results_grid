@@ -98,7 +98,7 @@
 
       if(cubeDimensions) {
         // there should be exactly 2 less locked dimensions than dimensions
-        return ((cubeDimensions.length -2 ) == Object.keys(lockedDimensions).length)
+        return ((cubeDimensions.length -2) == Object.keys(lockedDimensions).length);
       } else {
         alert('no dimensions exist');
         return false;
@@ -266,12 +266,15 @@
       return "<a class='cell-link' target='_blank' href='" + url + "'>" + text + "</a>";
     }
 
+    function getCubeDimensions() {
+      return cubeDimensions;
+    }
 
     // memoized lookup of all cube dimensions.
     function getAllDimensionsAsync(){
 
       if (!cubeDimensions) {
-        cubeDimensions = [];
+        cubeDimensions = []; //this is the object-level var.
         $.ajax({
           dataType: 'json',
           url: urlBase + "/dimensions.json",
@@ -361,6 +364,26 @@
       return lockedDimensions[dimensionUri];
     }
 
+    // retuns an array of cubeDimension objects.
+    function getLockedDimensionObjects() {
+      var retVal = [];
+
+      if (checkLockedDimensions()) {
+
+        var retVal;
+        for (var lockedDimensionUri in lockedDimensions) {
+          // find the right cube Dimension
+          $.each(cubeDimensions, function(i, cubeDim) {
+            if(cubeDim.uri == lockedDimensionUri) {
+              retVal.push(cubeDim);
+            }
+          });
+        }
+      }
+
+      return retVal;
+    }
+
     // public api.
     //////////////////
     return {
@@ -369,7 +392,7 @@
       //////////////////
       "getSlickGrid": getSlickGrid
 
-    , "getAllDimensionsAsync": getAllDimensionsAsync // raises cubeDimensionsReady with cubeDimensions as the arg
+    , "getAllDimensionsAsync": getAllDimensionsAsync // raises cubeDimensionsReady when cubeDimensions ready
 
     , "setRowsDimension": setRowsDimension
     , "getRowsDimension": getRowsDimension
@@ -379,6 +402,10 @@
 
     , "setLockedDimensionValue": setLockedDimensionValue
     , "getLockedDimensionValue": getLockedDimensionValue
+    , "getLockedDimensionObjects": getLockedDimensionObjects
+
+    , "checkLockedDimensions": checkLockedDimensions
+    , "getCubeDimensions": getCubeDimensions
 
       // events
       //////////////////
