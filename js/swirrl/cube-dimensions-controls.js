@@ -8,11 +8,13 @@
       , columnsDimenesionDropdown = null
       , lockedDimensionsDropdowns = []
       , lockedDimensionValuesDropdowns = []
+      , initialized = false
       ;
 
     // events
-    var onDimensionsReady = new Slick.Event();
-    var onDimensionsBusy = new Slick.Event();
+    var onReady = new Slick.Event();
+    var onBusy = new Slick.Event();
+    var onInitialized = new Slick.Event();
 
     // set up:
     /////////////////////
@@ -23,7 +25,7 @@
 
     function init() {
 
-      onDimensionsBusy.notify();
+      onBusy.notify();
 
       // make sure we've got all the dimensions we need. We assume that the cube has retrieved it's dimensions before starting here.
       if (!checkDimensions() ){
@@ -55,6 +57,7 @@
     function createLockedDimensionsDropdownsAnync() {
       // make drop downs for the locked dimensions
       var lockedDimensionsSelector = containerSelector + " .locked-dimensions";
+      var dimensionsReady = 0;
 
       $.each(cubeGrid.getLockedDimensionObjects(), function(i, lockedDim) {
 
@@ -87,11 +90,14 @@
           wireUpLockedDimensionDropdownChanged(dimensionsDropdown, valuesDropdown);
           wireUpLockedDimensionValuesChanged(valuesDropdown);
 
+          dimensionsReady++;
+          if (dimensionsReady == cubeGrid.getLockedDimensionObjects().length) {
+            onReady.notify(); // we've got all of em.
+            if(!initialized) {onInitialized.notify();}
+          }
           // now unsubscribe: we only want to do this setup once
           lockedDim.onValuesReady.unsubscribe(valuesReadyHandler);
-
-          onDimensionsReady.notify();
-        }
+        } // end handler func
 
         lockedDim.onValuesReady.subscribe(valuesReadyHandler);
         lockedDim.getValuesAsync();
@@ -124,13 +130,13 @@
 
     function getLockedDimensionUris() {
       return $.map( lockedDimensionsDropdowns, function(dd, i) {
-        return dd.uri;
+        return dd.getValue();
       });
     }
 
     function getLockedDimensionValues() {
       return $.map( lockedDimensionValuesDropdowns, function(dd, i) {
-        return dd.uri;
+        return dd.getValue();
       });
     }
 
@@ -204,11 +210,24 @@
       return unusedDimension;
     }
 
+    function findCubeDimensionWithUri(uri) {
+      var dim = null;
+
+      $.each( cubeGrid.getCubeDimensions(), function (i, cubeDim) {
+        if(uri == cubeDim.uri) {
+          dim = cubeDim;
+          return false;
+        }
+      });
+
+      return dim;
+    }
+
     function wireUpDimensionDropDownChanged(dropdown) {
 
       $(dropdown.jQueryElement).change(function(e) {
 
-        onDimensionsBusy.notify();
+        onBusy.notify();
 
         // Update the other drop downs accordingly...
         var newValue = $(this).val(); // what's the new value of this dropdown?
@@ -225,28 +244,14 @@
           // if this isn't a locked dimension we're done.
           // (locked ones do a follow-up extra bit).
           if(!dropdown.isLockedDimension) {
-            onDimensionsReady.notify();
+            onReady.notify();
           }
         }
-
       });
-    }
-
-    function findCubeDimensionWithUri(uri) {
-      var dim = null;
-
-      $.each( cubeGrid.getCubeDimensions(), function (i, cubeDim) {
-        if(uri == cubeDim.uri) {
-          dim = cubeDim;
-          return false;
-        }
-      });
-
-      return dim;
     }
 
     function wireUpLockedDimensionDropdownChanged(lockedDimDropdown, valuesDropdown) {
-      // do the normal stuff
+      // do the normal stuff (above).
       wireUpDimensionDropDownChanged(lockedDimDropdown);
 
       // plus:
@@ -260,26 +265,23 @@
         // find the dimension object with the uri
         var lockedDimension = findCubeDimensionWithUri(lockedDimensionUri);
 
-        var onReadyHandler = function (e, args) {
-          console.log('new values ready!');
-          console.log(args);
+        var onValuesReadyHandler = function (e, args) {
           valuesDropdown.populateOptions(args.values);
-          onDimensionsReady.notify();
-          lockedDimension.onValuesReady.unsubscribe(onReadyHandler); // only respond once.
+          onReady.notify();
+          lockedDimension.onValuesReady.unsubscribe(onValuesReadyHandler); // only respond once.
         }
 
         // update the options when the values arrive.
-        lockedDimension.onValuesReady.subscribe(onReadyHandler);
+        lockedDimension.onValuesReady.subscribe(onValuesReadyHandler);
         lockedDimension.getValuesAsync();
       });
     }
 
     function wireUpLockedDimensionValuesChanged(valuesDropdown) {
-      console.log('wireup values change');
-      $(valuesDropdown.jQueryElement).change(function(e) {
-        console.log('dimension values changed');
-        onDimensionsReady.notify();
-      });
+      // $(valuesDropdown.jQueryElement).change(function(e) {
+      //   onBusy.notify();
+      //   onReady.notify();
+      // });
     }
 
   return {
@@ -293,8 +295,9 @@
     , "disable": disable
 
       // events
-    , "onDimensionsBusy": onDimensionsBusy
-    , "onDimensionsReady": onDimensionsReady // contains the new values.
+    , "onBusy": onBusy
+    , "onReady": onReady // contains the new values.
+    , "onInitialized": onInitialized
     };
   }
 

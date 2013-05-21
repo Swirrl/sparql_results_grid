@@ -76,6 +76,7 @@
       , onGridColumnsReady = new Slick.Event()
       , onGridGettingData = new Slick.Event()
       , onGridReady = new Slick.Event()
+      , onGridInitialized = new Slick.Event()
       ;
 
     // some setup.
@@ -84,6 +85,9 @@
     // we will construct the slick grid once we have enough information.
 
     function initGridWhenReady() {
+
+      console.log('in init grid when ready');
+
       function readyHandler(e, args) {
         if (gridPrerequisitesReady()) {
           initGrid();
@@ -108,7 +112,7 @@
       if(cubeDimensions) {
         // there should be exactly 2 less locked dimensions than dimensions
         console.log(lockedDimensions);
-        return ((cubeDimensions.length -2) == Object.keys(lockedDimensions).length);
+        return !!((cubeDimensions.length -2) == Object.keys(lockedDimensions).length);
       } else {
         alert('no dimensions exist');
         return false;
@@ -116,13 +120,33 @@
     }
 
     function gridPrerequisitesReady(){
-      return (gridSize && gridColumns && lockedDimensions);
+      var ready = !!(gridSize && gridColumns && checkLockedDimensions());
+      console.log('prereq. ready?');
+      console.log(ready);
+      return ready;
+    }
+
+    function clear() {
+      // clear out the display
+      $(elementSelector).empty();
+
+      // reset some stuff dimensions.
+      rowsDimension = null
+      lockedDimensions = {}
+      columnsDimension = null
+      gridSize = null
+      gridColumns = null
+      orderByColumn = null // order by rows by default
+      orderDesc = false // order asc by default
     }
 
     function initGrid() {
       // when we've got grid size, columns, and the lockedDimensions we can construct the grid
 
+      console.log('in init grid');
+
       if(!checkLockedDimensions()) {
+        console.log('missing locked dimensions');
         alert('missing locked dimensions');
         return;
       }
@@ -193,12 +217,13 @@
         loader.ensureData(slickGrid.getViewport().top, slickGrid.getViewport().bottom, dataLoaderFunction);
       });
 
-
       // finally, ensure the loader has the right data,
       // to initialise the first 'page' of results
       //////////////////
       loader.ensureData(slickGrid.getViewport().top, slickGrid.getViewport().bottom, dataLoaderFunction);
 
+      // and set that we're initialized
+      onGridInitialized.notify();
     }
 
     // the function that the loader uses to get the data
@@ -405,6 +430,7 @@
       // methods
       //////////////////
       "getSlickGrid": getSlickGrid
+    , "clear": clear
 
     , "getAllDimensionsAsync": getAllDimensionsAsync // raises cubeDimensionsReady when cubeDimensions ready
 
@@ -431,6 +457,7 @@
 
     , "onGridGettingData": onGridGettingData
     , "onGridReady": onGridReady
+    , "onGridInitialized": onGridInitialized
     }
   }
 
