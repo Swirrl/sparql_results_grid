@@ -9,15 +9,13 @@
   <h1>Cube Viewer</h1>
 
   <div id="dimensions-controls">
-    <h3>Rows and Columns</h3>
-    Rows:
-    <select id="rows-dropdown" class="dimension-dropdown">
-    </select>
-    <br/>
+    <h3>Rows</h3>
+    <div id='rows-dimension-container'>
+    </div>
 
-    Columns:
-    <select id="columns-dropdown" class="dimension-dropdown">
-    </select>
+    <h3>Columns</h3>
+    <div id='columns-dimension-container'>
+    </div>
 
     <h3>Other dimensions</h3>
     <div class="locked-dimensions">
@@ -71,10 +69,34 @@
 
     // Construct a grid. This will populate itself when it has enough data.
     var cubeGrid = new Swirrl.CubeGrid(elementSelector, siteDomain, datasetSlug, pageSize)
-
+    var cubeDimensionsControls = null; // object to marshall communication between the grid and all the dimension controls
 
     cubeGrid.onGridReady.subscribe(function (e, args) {
-      setStatus("Ready.", false)
+      setStatus("Ready.", false);
+
+      cubeDimensionsControls.enable(); // enable the controls again once the grid is ready
+
+      // when grid is ready, start listnening to events from the controls
+      cubeDimensionsControls.onDimensionsReady.subscribe(function (e, args) {
+        // set rows and cols
+        cubeGrid.setRowsDimension(cubeDimensionsControls.getRowsDimension());
+        cubeGrid.setColumnsDimension(cubeDimensionsControls.getColumnsDimension());
+
+        // set locked dims
+        $.each(cubeDimensionsControls.getLockedDimensionUris(), function(i, lockedDimUri) {
+          var value = cubeDimensionsControls.getLockedDimensionValues()[i];
+          cubeGrid.setLockedDimensionValue(lockedDimUri, value)
+        });
+
+        // re-init grid
+        cubeGrid.initGridWhenReady();
+      });
+
+      cubeDimensionsControls.onDimensionsBusy.subscribe(function (e, args) {
+        cubeDimensionsControls.disable(); // disable the controls while they're busy.
+      });
+
+
     });
 
     cubeGrid.onGridGettingData.subscribe(function (e, args) {
@@ -82,473 +104,488 @@
     });
 
     cubeGrid.onCubeDimensionsReady.subscribe(function (e, args) {
-
       cubeDimensions = args.cubeDimensions;
-
       cubeGrid.setLockedDimensionValue(
         "http://opendatacommunities.org/def/housing/affordableHousingType",
         "http://opendatacommunities.org/def/housing/concept/affordable-housing-type/social-rent"
       );
 
-      // for now - hard code the initial dimensions.
+      // for now - hard code the initial dimensions - compute this on server somehow
       cubeGrid.setColumnsDimension(cubeDimensions[0]);
       cubeGrid.setRowsDimension(cubeDimensions[1]);
 
-      console.log(cubeGrid.getCubeDimensions());
-
-      // object to marshall communication between the grid and all the dimension controls
-      var cubeDimensionsControls = new Swirrl.CubeDimensionsControls(cubeGrid, "#dimensions-controls");
-
+      // construct a cubedimensionscontrols object from the grid
+      cubeDimensionsControls = new Swirrl.CubeDimensionsControls(cubeGrid, "#dimensions-controls");
     });
 
     cubeGrid.getAllDimensionsAsync();
 
-    // quit!
-    return;
-
-    // old stuff follows...
+    // // old stuff follows...
 
 
-    // EVENTS
-    var gridColsReady = new Slick.Event();
-    var gridSizeCalculated = new Slick.Event();
-    var dimensionsRetrieved = new Slick.Event();
+    // onDimensionsBusy.subscribe(function (e, args) {
+    //     console.log('dimensions busy');
+    //     disable();
+    //   });
 
-    var gridOptions = {
-      enableCellNavigation: false,
-      enableColumnReorder: false,
-      syncColumnCellResize: true,
-      rowHeight: 24
-    };
+    //   onDimensionsReady.subscribe(function (e, args) {
+    //     console.log('dimensions ready');
+    //     enable();
 
-    // some top-level closure-level variables.
-    var grid;
-    var loader;
-    var columnWidth = 350;
-    var gridSize;
-    var columns;
-    var orderByColumn = null; // order by rows by default
-    var orderDesc = false; // order asc by default
-    var loadingPages = 0;
-    var dimensions = []; // array of objects with {uri: http//dim-uri, label: dim-label}
+    //     // re-init grid from controls
+    //     cubeGrid.setRowsDimension(getRowsDimension);
+    //     cubeGrid.setColumnsDimension(getColumnsDimension);
 
-    // HARD-CODED (for now) dimensions.
+    //     $.each(lockedDimensionDropdowns, function(i, ldd) {
+    //       var value = lockedDimensionValuesDropdowns[i].getValue();
+    //       cubeGrid.setLockedDimensionValue(dimensionUri, value)
+    //     });
 
-    var datasetSlug = "additional-affordable-dwellings" ;
-    var rowsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refArea";
-    var rowsDimensionLabel = "Reference Area";
-    var columnsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refPeriod";
-    var lockedDimensions = {
-      "http://opendatacommunities.org/def/housing/affordableHousingType": "http://opendatacommunities.org/def/housing/concept/affordable-housing-type/social-rent"
-    }
+    //     cubeGrid.initGrid();
 
-    // var datasetSlug = "wellbeing-lsoa-happy-yesterday-mean";
+    //   });
+
+
+    // // EVENTS
+    // var gridColsReady = new Slick.Event();
+    // var gridSizeCalculated = new Slick.Event();
+    // var dimensionsRetrieved = new Slick.Event();
+
+    // var gridOptions = {
+    //   enableCellNavigation: false,
+    //   enableColumnReorder: false,
+    //   syncColumnCellResize: true,
+    //   rowHeight: 24
+    // };
+
+    // // some top-level closure-level variables.
+    // var grid;
+    // var loader;
+    // var columnWidth = 350;
+    // var gridSize;
+    // var columns;
+    // var orderByColumn = null; // order by rows by default
+    // var orderDesc = false; // order asc by default
+    // var loadingPages = 0;
+    // var dimensions = []; // array of objects with {uri: http//dim-uri, label: dim-label}
+
+    // // HARD-CODED (for now) dimensions.
+
+    // var datasetSlug = "additional-affordable-dwellings" ;
     // var rowsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refArea";
     // var rowsDimensionLabel = "Reference Area";
-    // var columnsDimension = "http://opendatacommunities.org/def/wellbeing/wellbeingQuestion";
+    // var columnsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refPeriod";
     // var lockedDimensions = {
-    //   "http://purl.org/linked-data/sdmx/2009/dimension#refPeriod": "http://reference.data.gov.uk/id/government-year/2011-2012"
+    //   "http://opendatacommunities.org/def/housing/affordableHousingType": "http://opendatacommunities.org/def/housing/concept/affordable-housing-type/social-rent"
     // }
 
-    function buildCellLink(uri, text) {
-      var url = uri;
-
-      // if string doesn't start with this domain, use the resource= style
-      if(url.indexOf('http://' + SITEDOMAIN) != 0) {
-        url = 'http://' + SITEDOMAIN + '/resource?uri=' + encodeURIComponent(uri);
-      }
-      return "<a class='cell-link' target='_blank' href='" + url + "'>" + text + "</a>";
-    }
-
-    function populateDimensionDropDown(selector) {
-      var select = $(selector);
-      select.empty();
-
-      for (var i=0; i< dimensions.length; i++) {
-        var dimension = dimensions[i];
-        var option = $("<option></option>");
-        option.attr("value", dimension["uri"] );
-        option.append(dimension["label"] || dimension["uri"]) ;
-        select.append(option);
-      }
-    }
-
-    function populateDimensionValueDropDown(selector, dimension) {
-
-      console.log('populating the dimvalue drop down');
-      console.log(selector);
-      console.log(dimension);
-
-      var select = $(selector);
-      select.empty();
-
-      // TODO: memoize the dimension values, so we don't need to go get them if we already know them.
-
-      // need to go  and get all the possible values for this dimension (if not got already).
-      var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_values.json?dimension=" + encodeURIComponent(dimension);
-
-      $.ajax({
-        url: url,
-        success: function(responseData, textStatus, jqXHR) {
-          console.log(responseData);
-          for (var i=0; i < responseData.length; i++) {
-
-            var dimensionValue = responseData[i];
-            console.log(dimensionValue);
-
-            var dimValueUri = dimensionValue["uri"];
-            var dimValueLabel = dimensionValue["label"] || dimensionValue["uri"];
-            var option = $("<option></option>");
-            option.attr("value", dimValueUri);
-            option.append(dimValueLabel || dimValueUri);
-            select.append(option);
-          }
-        },
-        error: function() {
-          console.log('error getting dimension values');
-        }
-      });
-    }
-
-    function setDimensionDropDownValue(selector, value) {
-      var select = $(selector);
-      select.val(value);
-    }
-
-    function generateLockedDimensionDropDownId(dimensionUri, isValue) {
-      var escapedDimensionUri = dimensionUri.replace(/[^a-zA-Z0-9\-\_]/gi, "-");
-      var theId = encodeURI(escapedDimensionUri).toString();
-      theId += '-dimension';
-      if(isValue) {
-        theId += '-value';
-      }
-      return theId;
-    }
-
-    function setupDimensionDropDowns(){
-
-      // create the 'other dimensions' dropdowns
-      for (var lockedDim in lockedDimensions) {
-        var dimSelect = $("<select><select>");
-        dimSelect.addClass("dimension-dropdown");
-        dimSelect.attr('id', generateLockedDimensionDropDownId(lockedDim, false));
-        $("div.locked-dimensions").append(dimSelect);
-        $("div.locked-dimensions").append(": ");
-
-        var dimValueSelect = $("<select><select>");
-        dimValueSelect.addClass("dimension-value-dropdown");
-        dimValueSelect.attr('id', generateLockedDimensionDropDownId(lockedDim, true));
-        $("div.locked-dimensions").append(dimValueSelect);
-        $("div.locked-dimensions").append("<br/>");
-
-        populateDimensionValueDropDown( dimValueSelect, lockedDim );
-      }
-
-      // populate all the dimension dropdowns
-      $("select.dimension-dropdown").each(function(i, el) {
-        populateDimensionDropDown(el);
-      });
-
-      // set values of rows and columns
-      setDimensionDropDownValue("select#rows-dropdown", rowsDimension);
-      setDimensionDropDownValue("select#columns-dropdown", columnsDimension);
-
-      // set values of other dimensions
-      for (var lockedDim in lockedDimensions) {
-
-        var lockedDimValue = lockedDimensions[lockedDim];
-
-        console.log(lockedDim);
-        console.log(lockedDimValue);
-
-        var dimSelectSelector = "#" + generateLockedDimensionDropDownId(lockedDim, false);
-        var dimValueSelectSelector = "#" + generateLockedDimensionDropDownId(lockedDim, true)
-
-        console.log(dimSelectSelector);
-        console.log(dimValueSelectSelector);
-
-        var dimSelect = $(dimSelectSelector);
-        var dimValueSelect = $(dimValueSelectSelector);
-
-        setDimensionDropDownValue(dimSelect, lockedDim);
-        setDimensionDropDownValue(dimValueSelect, lockedDimValue);
-      }
-
-    }
-
-    function getAllDimensions(){
-      console.log('in get all dimensions');
-
-      var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimensions.json"
-
-      $.ajax({
-        dataType: 'json',
-        url: url,
-        success: function(responseData, textStatus, jqXHR) {
-          dimensions = responseData; // set the top-level var.
-          console.log(dimensions);
-          dimensionsRetrieved.notify();
-        },
-        error: function() {
-          console.log('error loading columns');
-        }
-      });
-    }
-
-    function getColumns() {
-      function rawFormatter(row, cell, value, columnDef, dataContext) {
-        return value;
-      }
-
-      // TODO: memoize dimension values.
-
-      var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_values.json?dimension=" + encodeURIComponent(columnsDimension);
-
-      // start with row numbers (notice we're setting the top-level var).
-      columns = [{id: '__row_num', field: '__row_num', name: '#', width: 60, cssClass: 'row-num' }];
-
-      $.ajax({
-        dataType: 'json',
-        url: url,
-        success: function(responseData, textStatus, jqXHR) {
-          var rowDimensionLink = buildCellLink(rowsDimension, rowsDimensionLabel); //"<a href='" + rowsDimension + "'>" + rowsDimensionLabel + "</a>";
-
-          // start with just the row dimension
-          columns.push({id: rowsDimension, name: rowDimensionLink, field: rowsDimension, width: columnWidth, sortable:true, formatter: rawFormatter });
-
-          for (var i=0; i < responseData.length; i++) {
-            var columnUri = responseData[i]["uri"];
-            var columnLabel = responseData[i]["label"] || responseData[i]["uri"];
-            var columnLink = buildCellLink(columnUri, columnLabel); //  "<a href='" + columnUri + "'>" + columnLabel + "</a>";
-            columns.push({id: columnUri, name: columnLink, field: columnUri, width: columnWidth, sortable:true, formatter: rawFormatter });
-          }
-
-          gridColsReady.notify();
-
-        },
-        error: function() {
-          console.log('error loading columns');
-        }
-      });
-      return null;
-    }
-
-    function getGridSize() {
-      console.log('in get grid size');
-      var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_size.json?dimension=" + encodeURIComponent(rowsDimension);
-
-      // notice we're setting the top-level variable.
-      gridSize = 0;
-      $.ajax({
-        dataType: 'json',
-        url: url,
-        success: function(responseData, textStatus, jqXHR) {
-          gridSize = responseData['size'];
-          gridSizeCalculated.notify();
-        },
-        error: function() {
-          console.log('error loading grid size');
-        }
-      });
-      return null;
-    }
-
-    // deals with data coming back from the loaderFunction's ajax call.
-    function loaderAjaxSuccess(responseData, textStatus, jqXHR) {
-      var processedData = processResponseData(responseData);
-      loader.setPageOfData(jqXHR.page, processedData);
-    }
-
-    // add labels for rows.
-    function processResponseData(responseData) {
-
-      var start = new Date();
-
-      var processedData = [];
-
-      for( var i=0; i < responseData.length; i++ ) {
-
-        var row = responseData[i];
-        var processedRow = {};
-
-        for (var key in row) {
-          if (!(key == rowsDimension || key == "rowlabel" ) ){
-            var obsUri = row[key]["obs"];
-            var obsVal = row[key]["val"];
-            processedRow[key] = buildCellLink(obsUri, (obsVal || "").toString()); //"<a href='" + obsUri + "'>" + (obsVal || "").toString() + "</a>";
-          }
-        }
-
-        var rowUri = row[rowsDimension];
-        var rowLabel = row["rowlabel"];
-        processedRow[rowsDimension] = buildCellLink(rowUri, (rowLabel || rowUri)); // "<a href='" + rowUri + "'>" + (rowLabel || rowUri) + "</a>";
-
-        processedData.push(processedRow);
-      }
-
-      console.log( 'processing ' + processedData.length.toString() + ' rows took: ' + (new Date() - start) + 'ms');
-      return processedData;
-    }
-
-    function checkLoadingPages() {
-      console.log('no of loading pages');
-      console.log(loadingPages);
-      if (loadingPages == 0) {
-        setStatus('Ready.', false);
-      } else {
-        setStatus('Loading data...', true);
-      }
-    }
-
-    function incrementloadingPages(byAmount){
-      loadingPages += byAmount;
-      checkLoadingPages();
-    }
-
-    function loaderFunction(page) {
-
-      var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/observations.json"
-      url += "?rows_dimension=" + encodeURIComponent(rowsDimension);
-      url += "&columns_dimension=" + encodeURIComponent(columnsDimension);
-      url += "&per_page=" + PAGESIZE.toString();
-      url += "&page=" + (page+1).toString(); // 1 based pages on server
-
-      if (orderDesc) {
-        url += "&order_desc=true";
-      }
-
-      if (orderByColumn) {
-        url += "&order_by_column=" + encodeURIComponent(orderByColumn);
-      }
-
-      for (var lockedDimension in lockedDimensions) {
-        var dimensionVal = lockedDimensions[lockedDimension];
-        url += "&" + encodeURIComponent(lockedDimension) + "=" + encodeURIComponent(dimensionVal);
-      }
-
-      var req = $.ajax({
-        dataType: 'json',
-        url: url,
-        success: loaderAjaxSuccess,
-        error: function() {
-          console.log("error loading page: " + page);
-        }
-      });
-
-      req.page = page; // add a page property onto the jqXHR obj
-
-    }
-
-    function setStatus(status, busy) {
-      $(".grid-footer .grid-status .status-value").empty();
-      $(".grid-footer .grid-status .status-value").append(status);
-
-      if (busy) {
-        $(".grid-footer img.busy").show();
-      } else {
-        $(".grid-footer img.busy").hide();
-      }
-
-    }
-
-    function initGridAndLoader() {
-
-      loader = new Swirrl.DataLoader(gridSize, PAGESIZE);
-      grid = new Slick.Grid("#myGrid", loader.data, columns, gridOptions);
-      grid.setSortColumn(rowsDimension, true); // start it off being sorted by row dimension, asc.
-
-      loader.onPageLoading.subscribe(function (e, args) {
-        incrementloadingPages(+1);
-      });
-
-      loader.onPageLoaded.subscribe(function (e, args) {
-        incrementloadingPages(-1);
-      });
-
-      loader.onDataLoading.subscribe(function (e, args) {
-        // don't do anything
-      });
-
-      loader.onDataLoaded.subscribe(function (e, args) {
-        for (var i = args.from; i <= args.to; i++) {
-          grid.invalidateRow(i); // causes the appropriate rows to redraw.
-        }
-        grid.updateRowCount(); // uses data.length
-        grid.render();
-      });
-
-      var viewportChangedTimer;
-      grid.onViewportChanged.subscribe(function (e, args) {
-        clearTimeout(viewportChangedTimer);
-
-        viewportChangedTimer = setTimeout( function() {
-          loader.ensureData(grid.getViewport().top, grid.getViewport().bottom, loaderFunction);
-         }, 200);// only fire this every 1/5 sec at most.
-      });
-
-      grid.onSort.subscribe(function (e, args) {
-
-        // don't sort when clicking on the links;
-        if ($(e.target).hasClass('cell-link')) {
-
-          // set it back to what it was before
-          if(orderByColumn == null) {
-            grid.setSortColumn(rowsDimension, (!orderDesc));
-          } else {
-            grid.setSortColumn(orderByColumn, (!orderDesc));
-          }
-
-          // and do nothing else
-          return false;
-        }
-
-        if (args.sortCol.field == rowsDimension) {
-          orderByColumn = null;
-        } else {
-          orderByColumn = args.sortCol.field;
-        }
-
-        orderDesc = args.sortAsc ? false : true;
-
-        loader.clear();
-        grid.setData(loader.data, true);
-        loader.ensureData(grid.getViewport().top, grid.getViewport().bottom, loaderFunction);
-      });
-
-      loader.ensureData(grid.getViewport().top, grid.getViewport().bottom, loaderFunction);
-
-    }
-
-    function initGridAndLoaderWhenReady() {
-      // when everything is ready, init the grid.
-      if (gridColsReadyRaised && gridSizeCalculatedRaised) {
-        initGridAndLoader();
-      }
-    }
-
-    var gridColsReadyRaised = false;
-    var gridSizeCalculatedRaised = false;
-
-    gridColsReady.subscribe(function(e, args) {
-      gridColsReadyRaised = true;
-      initGridAndLoaderWhenReady();
-    });
-
-    gridSizeCalculated.subscribe(function(e, args) {
-      gridSizeCalculatedRaised = true;
-      initGridAndLoaderWhenReady();
-    });
-
-    dimensionsRetrieved.subscribe(function(e, args) {
-      setupDimensionDropDowns();
-    });
-
-    setStatus('Initializing grid...', true);
-    grid = new Slick.Grid("#myGrid", [], [], gridOptions);
-
-    getAllDimensions();
-    getColumns();
-    getGridSize();
+    // // var datasetSlug = "wellbeing-lsoa-happy-yesterday-mean";
+    // // var rowsDimension = "http://purl.org/linked-data/sdmx/2009/dimension#refArea";
+    // // var rowsDimensionLabel = "Reference Area";
+    // // var columnsDimension = "http://opendatacommunities.org/def/wellbeing/wellbeingQuestion";
+    // // var lockedDimensions = {
+    // //   "http://purl.org/linked-data/sdmx/2009/dimension#refPeriod": "http://reference.data.gov.uk/id/government-year/2011-2012"
+    // // }
+
+    // function buildCellLink(uri, text) {
+    //   var url = uri;
+
+    //   // if string doesn't start with this domain, use the resource= style
+    //   if(url.indexOf('http://' + SITEDOMAIN) != 0) {
+    //     url = 'http://' + SITEDOMAIN + '/resource?uri=' + encodeURIComponent(uri);
+    //   }
+    //   return "<a class='cell-link' target='_blank' href='" + url + "'>" + text + "</a>";
+    // }
+
+    // function populateDimensionDropDown(selector) {
+    //   var select = $(selector);
+    //   select.empty();
+
+    //   for (var i=0; i< dimensions.length; i++) {
+    //     var dimension = dimensions[i];
+    //     var option = $("<option></option>");
+    //     option.attr("value", dimension["uri"] );
+    //     option.append(dimension["label"] || dimension["uri"]) ;
+    //     select.append(option);
+    //   }
+    // }
+
+    // function populateDimensionValueDropDown(selector, dimension) {
+
+    //   console.log('populating the dimvalue drop down');
+    //   console.log(selector);
+    //   console.log(dimension);
+
+    //   var select = $(selector);
+    //   select.empty();
+
+    //   // TODO: memoize the dimension values, so we don't need to go get them if we already know them.
+
+    //   // need to go  and get all the possible values for this dimension (if not got already).
+    //   var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_values.json?dimension=" + encodeURIComponent(dimension);
+
+    //   $.ajax({
+    //     url: url,
+    //     success: function(responseData, textStatus, jqXHR) {
+    //       console.log(responseData);
+    //       for (var i=0; i < responseData.length; i++) {
+
+    //         var dimensionValue = responseData[i];
+    //         console.log(dimensionValue);
+
+    //         var dimValueUri = dimensionValue["uri"];
+    //         var dimValueLabel = dimensionValue["label"] || dimensionValue["uri"];
+    //         var option = $("<option></option>");
+    //         option.attr("value", dimValueUri);
+    //         option.append(dimValueLabel || dimValueUri);
+    //         select.append(option);
+    //       }
+    //     },
+    //     error: function() {
+    //       console.log('error getting dimension values');
+    //     }
+    //   });
+    // }
+
+    // function setDimensionDropDownValue(selector, value) {
+    //   var select = $(selector);
+    //   select.val(value);
+    // }
+
+    // function generateLockedDimensionDropDownId(dimensionUri, isValue) {
+    //   var escapedDimensionUri = dimensionUri.replace(/[^a-zA-Z0-9\-\_]/gi, "-");
+    //   var theId = encodeURI(escapedDimensionUri).toString();
+    //   theId += '-dimension';
+    //   if(isValue) {
+    //     theId += '-value';
+    //   }
+    //   return theId;
+    // }
+
+    // function setupDimensionDropDowns(){
+
+    //   // create the 'other dimensions' dropdowns
+    //   for (var lockedDim in lockedDimensions) {
+    //     var dimSelect = $("<select><select>");
+    //     dimSelect.addClass("dimension-dropdown");
+    //     dimSelect.attr('id', generateLockedDimensionDropDownId(lockedDim, false));
+    //     $("div.locked-dimensions").append(dimSelect);
+    //     $("div.locked-dimensions").append(": ");
+
+    //     var dimValueSelect = $("<select><select>");
+    //     dimValueSelect.addClass("dimension-value-dropdown");
+    //     dimValueSelect.attr('id', generateLockedDimensionDropDownId(lockedDim, true));
+    //     $("div.locked-dimensions").append(dimValueSelect);
+    //     $("div.locked-dimensions").append("<br/>");
+
+    //     populateDimensionValueDropDown( dimValueSelect, lockedDim );
+    //   }
+
+    //   // populate all the dimension dropdowns
+    //   $("select.dimension-dropdown").each(function(i, el) {
+    //     populateDimensionDropDown(el);
+    //   });
+
+    //   // set values of rows and columns
+    //   setDimensionDropDownValue("select#rows-dropdown", rowsDimension);
+    //   setDimensionDropDownValue("select#columns-dropdown", columnsDimension);
+
+    //   // set values of other dimensions
+    //   for (var lockedDim in lockedDimensions) {
+
+    //     var lockedDimValue = lockedDimensions[lockedDim];
+
+    //     console.log(lockedDim);
+    //     console.log(lockedDimValue);
+
+    //     var dimSelectSelector = "#" + generateLockedDimensionDropDownId(lockedDim, false);
+    //     var dimValueSelectSelector = "#" + generateLockedDimensionDropDownId(lockedDim, true)
+
+    //     console.log(dimSelectSelector);
+    //     console.log(dimValueSelectSelector);
+
+    //     var dimSelect = $(dimSelectSelector);
+    //     var dimValueSelect = $(dimValueSelectSelector);
+
+    //     setDimensionDropDownValue(dimSelect, lockedDim);
+    //     setDimensionDropDownValue(dimValueSelect, lockedDimValue);
+    //   }
+
+    // }
+
+    // function getAllDimensions(){
+    //   console.log('in get all dimensions');
+
+    //   var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimensions.json"
+
+    //   $.ajax({
+    //     dataType: 'json',
+    //     url: url,
+    //     success: function(responseData, textStatus, jqXHR) {
+    //       dimensions = responseData; // set the top-level var.
+    //       console.log(dimensions);
+    //       dimensionsRetrieved.notify();
+    //     },
+    //     error: function() {
+    //       console.log('error loading columns');
+    //     }
+    //   });
+    // }
+
+    // function getColumns() {
+    //   function rawFormatter(row, cell, value, columnDef, dataContext) {
+    //     return value;
+    //   }
+
+    //   // TODO: memoize dimension values.
+
+    //   var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_values.json?dimension=" + encodeURIComponent(columnsDimension);
+
+    //   // start with row numbers (notice we're setting the top-level var).
+    //   columns = [{id: '__row_num', field: '__row_num', name: '#', width: 60, cssClass: 'row-num' }];
+
+    //   $.ajax({
+    //     dataType: 'json',
+    //     url: url,
+    //     success: function(responseData, textStatus, jqXHR) {
+    //       var rowDimensionLink = buildCellLink(rowsDimension, rowsDimensionLabel); //"<a href='" + rowsDimension + "'>" + rowsDimensionLabel + "</a>";
+
+    //       // start with just the row dimension
+    //       columns.push({id: rowsDimension, name: rowDimensionLink, field: rowsDimension, width: columnWidth, sortable:true, formatter: rawFormatter });
+
+    //       for (var i=0; i < responseData.length; i++) {
+    //         var columnUri = responseData[i]["uri"];
+    //         var columnLabel = responseData[i]["label"] || responseData[i]["uri"];
+    //         var columnLink = buildCellLink(columnUri, columnLabel); //  "<a href='" + columnUri + "'>" + columnLabel + "</a>";
+    //         columns.push({id: columnUri, name: columnLink, field: columnUri, width: columnWidth, sortable:true, formatter: rawFormatter });
+    //       }
+
+    //       gridColsReady.notify();
+
+    //     },
+    //     error: function() {
+    //       console.log('error loading columns');
+    //     }
+    //   });
+    //   return null;
+    // }
+
+    // function getGridSize() {
+    //   console.log('in get grid size');
+    //   var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/dimension_size.json?dimension=" + encodeURIComponent(rowsDimension);
+
+    //   // notice we're setting the top-level variable.
+    //   gridSize = 0;
+    //   $.ajax({
+    //     dataType: 'json',
+    //     url: url,
+    //     success: function(responseData, textStatus, jqXHR) {
+    //       gridSize = responseData['size'];
+    //       gridSizeCalculated.notify();
+    //     },
+    //     error: function() {
+    //       console.log('error loading grid size');
+    //     }
+    //   });
+    //   return null;
+    // }
+
+    // // deals with data coming back from the loaderFunction's ajax call.
+    // function loaderAjaxSuccess(responseData, textStatus, jqXHR) {
+    //   var processedData = processResponseData(responseData);
+    //   loader.setPageOfData(jqXHR.page, processedData);
+    // }
+
+    // // add labels for rows.
+    // function processResponseData(responseData) {
+
+    //   var start = new Date();
+
+    //   var processedData = [];
+
+    //   for( var i=0; i < responseData.length; i++ ) {
+
+    //     var row = responseData[i];
+    //     var processedRow = {};
+
+    //     for (var key in row) {
+    //       if (!(key == rowsDimension || key == "rowlabel" ) ){
+    //         var obsUri = row[key]["obs"];
+    //         var obsVal = row[key]["val"];
+    //         processedRow[key] = buildCellLink(obsUri, (obsVal || "").toString()); //"<a href='" + obsUri + "'>" + (obsVal || "").toString() + "</a>";
+    //       }
+    //     }
+
+    //     var rowUri = row[rowsDimension];
+    //     var rowLabel = row["rowlabel"];
+    //     processedRow[rowsDimension] = buildCellLink(rowUri, (rowLabel || rowUri)); // "<a href='" + rowUri + "'>" + (rowLabel || rowUri) + "</a>";
+
+    //     processedData.push(processedRow);
+    //   }
+
+    //   console.log( 'processing ' + processedData.length.toString() + ' rows took: ' + (new Date() - start) + 'ms');
+    //   return processedData;
+    // }
+
+    // function checkLoadingPages() {
+    //   console.log('no of loading pages');
+    //   console.log(loadingPages);
+    //   if (loadingPages == 0) {
+    //     setStatus('Ready.', false);
+    //   } else {
+    //     setStatus('Loading data...', true);
+    //   }
+    // }
+
+    // function incrementloadingPages(byAmount){
+    //   loadingPages += byAmount;
+    //   checkLoadingPages();
+    // }
+
+    // function loaderFunction(page) {
+
+    //   var url = "http://" + SITEDOMAIN + "/data/" + datasetSlug + "/cube/observations.json"
+    //   url += "?rows_dimension=" + encodeURIComponent(rowsDimension);
+    //   url += "&columns_dimension=" + encodeURIComponent(columnsDimension);
+    //   url += "&per_page=" + PAGESIZE.toString();
+    //   url += "&page=" + (page+1).toString(); // 1 based pages on server
+
+    //   if (orderDesc) {
+    //     url += "&order_desc=true";
+    //   }
+
+    //   if (orderByColumn) {
+    //     url += "&order_by_column=" + encodeURIComponent(orderByColumn);
+    //   }
+
+    //   for (var lockedDimension in lockedDimensions) {
+    //     var dimensionVal = lockedDimensions[lockedDimension];
+    //     url += "&" + encodeURIComponent(lockedDimension) + "=" + encodeURIComponent(dimensionVal);
+    //   }
+
+    //   var req = $.ajax({
+    //     dataType: 'json',
+    //     url: url,
+    //     success: loaderAjaxSuccess,
+    //     error: function() {
+    //       console.log("error loading page: " + page);
+    //     }
+    //   });
+
+    //   req.page = page; // add a page property onto the jqXHR obj
+
+    // }
+
+    // function setStatus(status, busy) {
+    //   $(".grid-footer .grid-status .status-value").empty();
+    //   $(".grid-footer .grid-status .status-value").append(status);
+
+    //   if (busy) {
+    //     $(".grid-footer img.busy").show();
+    //   } else {
+    //     $(".grid-footer img.busy").hide();
+    //   }
+
+    // }
+
+    // function initGridAndLoader() {
+
+    //   loader = new Swirrl.DataLoader(gridSize, PAGESIZE);
+    //   grid = new Slick.Grid("#myGrid", loader.data, columns, gridOptions);
+    //   grid.setSortColumn(rowsDimension, true); // start it off being sorted by row dimension, asc.
+
+    //   loader.onPageLoading.subscribe(function (e, args) {
+    //     incrementloadingPages(+1);
+    //   });
+
+    //   loader.onPageLoaded.subscribe(function (e, args) {
+    //     incrementloadingPages(-1);
+    //   });
+
+    //   loader.onDataLoading.subscribe(function (e, args) {
+    //     // don't do anything
+    //   });
+
+    //   loader.onDataLoaded.subscribe(function (e, args) {
+    //     for (var i = args.from; i <= args.to; i++) {
+    //       grid.invalidateRow(i); // causes the appropriate rows to redraw.
+    //     }
+    //     grid.updateRowCount(); // uses data.length
+    //     grid.render();
+    //   });
+
+    //   var viewportChangedTimer;
+    //   grid.onViewportChanged.subscribe(function (e, args) {
+    //     clearTimeout(viewportChangedTimer);
+
+    //     viewportChangedTimer = setTimeout( function() {
+    //       loader.ensureData(grid.getViewport().top, grid.getViewport().bottom, loaderFunction);
+    //      }, 200);// only fire this every 1/5 sec at most.
+    //   });
+
+    //   grid.onSort.subscribe(function (e, args) {
+
+    //     // don't sort when clicking on the links;
+    //     if ($(e.target).hasClass('cell-link')) {
+
+    //       // set it back to what it was before
+    //       if(orderByColumn == null) {
+    //         grid.setSortColumn(rowsDimension, (!orderDesc));
+    //       } else {
+    //         grid.setSortColumn(orderByColumn, (!orderDesc));
+    //       }
+
+    //       // and do nothing else
+    //       return false;
+    //     }
+
+    //     if (args.sortCol.field == rowsDimension) {
+    //       orderByColumn = null;
+    //     } else {
+    //       orderByColumn = args.sortCol.field;
+    //     }
+
+    //     orderDesc = args.sortAsc ? false : true;
+
+    //     loader.clear();
+    //     grid.setData(loader.data, true);
+    //     loader.ensureData(grid.getViewport().top, grid.getViewport().bottom, loaderFunction);
+    //   });
+
+    //   loader.ensureData(grid.getViewport().top, grid.getViewport().bottom, loaderFunction);
+
+    // }
+
+    // function initGridAndLoaderWhenReady() {
+    //   // when everything is ready, init the grid.
+    //   if (gridColsReadyRaised && gridSizeCalculatedRaised) {
+    //     initGridAndLoader();
+    //   }
+    // }
+
+    // var gridColsReadyRaised = false;
+    // var gridSizeCalculatedRaised = false;
+
+    // gridColsReady.subscribe(function(e, args) {
+    //   gridColsReadyRaised = true;
+    //   initGridAndLoaderWhenReady();
+    // });
+
+    // gridSizeCalculated.subscribe(function(e, args) {
+    //   gridSizeCalculatedRaised = true;
+    //   initGridAndLoaderWhenReady();
+    // });
+
+    // dimensionsRetrieved.subscribe(function(e, args) {
+    //   setupDimensionDropDowns();
+    // });
+
+    // setStatus('Initializing grid...', true);
+    // grid = new Slick.Grid("#myGrid", [], [], gridOptions);
+
+    // getAllDimensions();
+    // getColumns();
+    // getGridSize();
 
   });
 </script>

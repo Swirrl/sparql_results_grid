@@ -83,13 +83,22 @@
 
     // we will construct the slick grid once we have enough information.
 
-    onGridSizeReady.subscribe(function (e, args) {
-      constructGridWhenReady();
-    });
+    function initGridWhenReady() {
+      function readyHandler(e, args) {
+        if (gridPrerequisitesReady()) {
+          initGrid();
 
-    onGridColumnsReady.subscribe(function (e, args) {
-      constructGridWhenReady();
-    });
+          // only do this once.
+          onGridSizeReady.unsubscribe(readyHandler);
+          onGridColumnsReady.unsubscribe(readyHandler);
+        }
+      }
+
+      onGridSizeReady.subscribe(readyHandler);
+      onGridColumnsReady.subscribe(readyHandler);
+    }
+
+    initGridWhenReady();
 
     // private funcs
     //////////////////
@@ -98,6 +107,7 @@
 
       if(cubeDimensions) {
         // there should be exactly 2 less locked dimensions than dimensions
+        console.log(lockedDimensions);
         return ((cubeDimensions.length -2) == Object.keys(lockedDimensions).length);
       } else {
         alert('no dimensions exist');
@@ -105,7 +115,11 @@
       }
     }
 
-    function constructGridWhenReady() {
+    function gridPrerequisitesReady(){
+      return (gridSize && gridColumns && lockedDimensions);
+    }
+
+    function initGrid() {
       // when we've got grid size, columns, and the lockedDimensions we can construct the grid
 
       if(!checkLockedDimensions()) {
@@ -113,82 +127,78 @@
         return;
       }
 
-      if (gridSize && gridColumns && lockedDimensions) {
+      // construct the grid with a loader.
+      loader = new Swirrl.DataLoader(gridSize, pageSize);
+      slickGrid = new Slick.Grid(elementSelector, loader.data, gridColumns, SLICKGRIDOPTIONS);
+      slickGrid.setSortColumn(rowsDimension.uri, true); // start it off being sorted by row dimension, asc
 
-        // construct the grid with a loader.
-        loader = new Swirrl.DataLoader(gridSize, pageSize);
-        slickGrid = new Slick.Grid(elementSelector, loader.data, gridColumns, SLICKGRIDOPTIONS);
-        slickGrid.setSortColumn(rowsDimension.uri, true); // start it off being sorted by row dimension, asc
+      // now subscribe to some events:
+      ////////////////////////////////
 
+      // high level busy and ready events:
+      loader.onReady.subscribe(function() {
+        onGridReady.notify();
+      });
 
-        // now subscribe to some events:
-        ////////////////////////////////
+      loader.onBusy.subscribe(function() {
+        onGridGettingData.notify();
+      });
 
-        // high level busy and ready events:
-        loader.onReady.subscribe(function() {
-          onGridReady.notify();
-        });
+      // when a bunch of rows are loaded,
+      // re-render them.
+      loader.onDataLoaded.subscribe(function (e, args) {
+        for (var i = args.from; i <= args.to; i++) {
+          slickGrid.invalidateRow(i); // causes the appropriate rows to redraw.
+        }
+        slickGrid.updateRowCount(); // uses data.length
+        slickGrid.render();
+      });
 
-        loader.onBusy.subscribe(function() {
-          onGridGettingData.notify();
-        });
+      // When the viewport changes, ensure the loader has the relevent data.
+      // (when scrolling stops for 200ms)
+      var viewportChangedTimer;
+      slickGrid.onViewportChanged.subscribe(function (e, args) {
+        clearTimeout(viewportChangedTimer);
 
-        // when a bunch of rows are loaded,
-        // re-render them.
-        loader.onDataLoaded.subscribe(function (e, args) {
-          for (var i = args.from; i <= args.to; i++) {
-            slickGrid.invalidateRow(i); // causes the appropriate rows to redraw.
-          }
-          slickGrid.updateRowCount(); // uses data.length
-          slickGrid.render();
-        });
-
-        // When the viewport changes, ensure the loader has the relevent data.
-        // (when scrolling stops for 200ms)
-        var viewportChangedTimer;
-        slickGrid.onViewportChanged.subscribe(function (e, args) {
-          clearTimeout(viewportChangedTimer);
-
-          viewportChangedTimer = setTimeout( function() {
-            loader.ensureData(slickGrid.getViewport().top, slickGrid.getViewport().bottom, dataLoaderFunction);
-           }, 200); // 200ms delay.
-        });
-
-        // Sorting behaviour:
-        slickGrid.onSort.subscribe(function (e, args) {
-
-          // hack to avoid sorting when clicking on links in col headers
-          // (by setting sort back to what it was before click).
-          if ($(e.target).hasClass('cell-link')) {
-            if(orderByColumn == null) {
-              grid.setSortColumn(rowsDimension.uri, (!orderDesc));
-            } else {
-              grid.setSortColumn(orderByColumn, (!orderDesc));
-            }
-            return false;  // and do nothing else
-          }
-
-          // work out the column and order to sort by
-          if (args.sortCol.field == rowsDimension.uri) {
-            orderByColumn = null;
-          } else {
-            orderByColumn = args.sortCol.field;
-          }
-          orderDesc = args.sortAsc ? false : true;
-
-          // tell the loader to re-get the data.
-          loader.clear();
-          slickGrid.setData(loader.data, true);
+        viewportChangedTimer = setTimeout( function() {
           loader.ensureData(slickGrid.getViewport().top, slickGrid.getViewport().bottom, dataLoaderFunction);
-        });
+         }, 200); // 200ms delay.
+      });
 
+      // Sorting behaviour:
+      slickGrid.onSort.subscribe(function (e, args) {
 
-        // finally, ensure the loader has the right data,
-        // to initialise the first 'page' of results
-        //////////////////
+        // hack to avoid sorting when clicking on links in col headers
+        // (by setting sort back to what it was before click).
+        if ($(e.target).hasClass('cell-link')) {
+          if(orderByColumn == null) {
+            grid.setSortColumn(rowsDimension.uri, (!orderDesc));
+          } else {
+            grid.setSortColumn(orderByColumn, (!orderDesc));
+          }
+          return false;  // and do nothing else
+        }
+
+        // work out the column and order to sort by
+        if (args.sortCol.field == rowsDimension.uri) {
+          orderByColumn = null;
+        } else {
+          orderByColumn = args.sortCol.field;
+        }
+        orderDesc = args.sortAsc ? false : true;
+
+        // tell the loader to re-get the data.
+        loader.clear();
+        slickGrid.setData(loader.data, true);
         loader.ensureData(slickGrid.getViewport().top, slickGrid.getViewport().bottom, dataLoaderFunction);
+      });
 
-      }
+
+      // finally, ensure the loader has the right data,
+      // to initialise the first 'page' of results
+      //////////////////
+      loader.ensureData(slickGrid.getViewport().top, slickGrid.getViewport().bottom, dataLoaderFunction);
+
     }
 
     // the function that the loader uses to get the data
@@ -300,12 +310,14 @@
     function setRowsDimension(cubeDimension) {
       rowsDimension = cubeDimension;
 
-      rowsDimension.onSizeReady.subscribe(function(e, args) {
+      var sizeReadyHandler = function(e, args) {
         // this is the Size of this dimension
         gridSize = args.size;
         onGridSizeReady.notify({gridSize: gridSize});
-      });
+        rowsDimension.onSizeReady.unsubscribe(sizeReadyHandler); // only do it once.
+      }
 
+      rowsDimension.onSizeReady.subscribe(sizeReadyHandler);
       rowsDimension.getSizeAsync();
     }
 
@@ -340,15 +352,17 @@
     function setColumnsDimension(cubeDimension) {
       columnsDimension = cubeDimension;
 
-      columnsDimension.onValuesReady.subscribe(function(e, args) {
+      var onValuesReadyHandler = function(e, args) {
         // this is the list of columns.
         var cols = args.values;
-
         setGridColumns(cols);
+        onGridColumnsReady.notify({gridColumns: gridColumns});
 
-        onGridColumnsReady.notify({gridColumns: gridColumns})
-      });
+        // unsubscribe: we only want to do this once.
+        columnsDimension.onValuesReady.unsubscribe(onValuesReadyHandler);
+      }
 
+      columnsDimension.onValuesReady.subscribe(onValuesReadyHandler);
       columnsDimension.getValuesAsync();
     }
 
@@ -406,6 +420,8 @@
 
     , "checkLockedDimensions": checkLockedDimensions
     , "getCubeDimensions": getCubeDimensions
+
+    , "initGridWhenReady": initGridWhenReady // re-initialises grid from currently set dims when all the pre-reqs have arrived.
 
       // events
       //////////////////

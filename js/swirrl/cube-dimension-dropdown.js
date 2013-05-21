@@ -1,16 +1,17 @@
 (function ($) {
 
   // posisble values needs to be an array of objects which respond to uri and label.
-  function CubeDimensionDropdown(dimensionUri, possibleValues, isValueDropDown) {
+  function CubeDimensionDropdown(possibleValues, elementId, isLockedDimension) {
 
     // private vars
     ///////////////
-    var elementId = null;
-    var jQueryElement = null;
-    var currentValue = null;
+    var jQueryElement = null
+      , currentValue = null
+      ;
 
     // some setup
     //////////////////
+    isLockedDimension = !!isLockedDimension;
 
     init();
 
@@ -18,19 +19,27 @@
     /////////////////
 
     function init() {
-      // work out its id
-      elementId = generateId();
-
       // create the element
       jQueryElement = $("<select></select>");
       jQueryElement.addClass("dimension-dropdown");
       jQueryElement.attr('id', elementId);
 
       // add all the options
-      populateOptions();
+      populateOptions(possibleValues);
     }
 
-    function populateOptions() {
+    function disable() {
+      jQueryElement.attr("disabled", "disabled");
+      return jQueryElement;
+    }
+
+    function enable() {
+      jQueryElement.removeAttr("disabled");
+      return jQueryElement;
+    }
+
+    function populateOptions(possibleValues) {
+      empty();
       $.each(possibleValues, function (i, possVal) {
         var option = $("<option></option>");
         option.attr("value", possVal.uri);
@@ -39,22 +48,17 @@
       });
     }
 
-    function generateId() {
-      var theId = dimensionUri.replace(/[^a-zA-Z0-9\-\_]/gi, "-");
-
-      theId += '-dimension';
-      if(isValueDropDown) {
-        theId += '-value';
-      }
-      return theId;
-    }
-
     function setValue(value) {
       jQueryElement.val(value);
+      return jQueryElement;
     }
 
     function getValue() {
-      jQueryElement.val();
+      return jQueryElement.val();
+    }
+
+    function empty() {
+      jQueryElement.empty();
     }
 
     // public api.
@@ -63,13 +67,16 @@
       // properties
       "elementId": elementId
     , "jQueryElement": jQueryElement
+    , "isLockedDimension": isLockedDimension
 
       // methods
     , "setValue": setValue
     , "getValue": getValue
-
+    , "empty": empty
+    , "populateOptions": populateOptions
+    , "disable": disable
+    , "enable": enable
       // events
-
 
     }
 
