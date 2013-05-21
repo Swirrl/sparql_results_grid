@@ -278,10 +278,10 @@
     }
 
     function wireUpLockedDimensionValuesChanged(valuesDropdown) {
-      // $(valuesDropdown.jQueryElement).change(function(e) {
-      //   onBusy.notify();
-      //   onReady.notify();
-      // });
+      $(valuesDropdown.jQueryElement).change(function(e) {
+        onBusy.notify();
+        onReady.notify();
+      });
     }
 
   return {
